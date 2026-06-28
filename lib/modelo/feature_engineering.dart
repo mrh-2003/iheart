@@ -1,5 +1,5 @@
-import 'package:optima_ml/datos/repositorio_perfil.dart';
-import 'package:optima_ml/datos/repositorio_diagnosticos.dart';
+import 'package:iheart/datos/repositorio_perfil.dart';
+import 'package:iheart/datos/repositorio_diagnosticos.dart';
 
 class FeatureEngineering {
   static List<double> generarFeatures({

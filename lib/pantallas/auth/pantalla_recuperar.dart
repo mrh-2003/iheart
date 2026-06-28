@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:optima_ml/nucleo/tema.dart';
-import 'package:optima_ml/nucleo/extensiones.dart';
-import 'package:optima_ml/widgets/boton_primario.dart';
-import 'package:optima_ml/widgets/boton_secundario.dart';
-import 'package:optima_ml/widgets/campo_texto.dart';
+import 'package:iheart/nucleo/tema.dart';
+import 'package:iheart/nucleo/extensiones.dart';
+import 'package:iheart/widgets/boton_primario.dart';
+import 'package:iheart/widgets/boton_secundario.dart';
+import 'package:iheart/widgets/campo_texto.dart';
 
 class PantallaRecuperar extends StatefulWidget {
   const PantallaRecuperar({super.key});

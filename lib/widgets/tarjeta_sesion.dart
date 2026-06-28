@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:optima_ml/datos/repositorio_sesiones.dart';
-import 'package:optima_ml/nucleo/tema.dart';
+import 'package:iheart/datos/repositorio_sesiones.dart';
+import 'package:iheart/nucleo/tema.dart';
 
 class TarjetaSesion extends StatelessWidget {
   final SesionMonitoreo sesion;

@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:optima_ml/red/cliente_api.dart';
+import 'package:iheart/red/cliente_api.dart';
 
 class ServicioModelo {
   final ClienteApi _cliente = ClienteApi.instancia;

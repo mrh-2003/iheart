@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:optima_ml/nucleo/tema.dart';
-import 'package:optima_ml/nucleo/proveedor_estado.dart';
-import 'package:optima_ml/widgets/boton_primario.dart';
-import 'package:optima_ml/widgets/tarjeta_riesgo.dart';
-import 'package:optima_ml/widgets/grafico_ppg.dart';
-import 'package:optima_ml/widgets/barra_navegacion.dart';
+import 'package:iheart/nucleo/tema.dart';
+import 'package:iheart/nucleo/proveedor_estado.dart';
+import 'package:iheart/widgets/boton_primario.dart';
+import 'package:iheart/widgets/tarjeta_riesgo.dart';
+import 'package:iheart/widgets/grafico_ppg.dart';
+import 'package:iheart/widgets/barra_navegacion.dart';
 
-import 'package:optima_ml/pantallas/evaluar/pantalla_cuestionario.dart';
-import 'package:optima_ml/pantallas/historial/pantalla_historial.dart';
-import 'package:optima_ml/pantallas/perfil/pantalla_perfil.dart';
-import 'package:optima_ml/pantallas/ajustes/pantalla_ajustes.dart';
+import 'package:iheart/pantallas/evaluar/pantalla_cuestionario.dart';
+import 'package:iheart/pantallas/historial/pantalla_historial.dart';
+import 'package:iheart/pantallas/perfil/pantalla_perfil.dart';
+import 'package:iheart/pantallas/ajustes/pantalla_ajustes.dart';
 
 class PantallaInicio extends StatefulWidget {
   final int indiceInicial;

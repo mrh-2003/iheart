@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
-import 'package:optima_ml/modelo/preprocesamiento.dart';
+import 'package:iheart/modelo/preprocesamiento.dart';
 
 class InferenciaLocal {
   static final InferenciaLocal instancia = InferenciaLocal._interna();

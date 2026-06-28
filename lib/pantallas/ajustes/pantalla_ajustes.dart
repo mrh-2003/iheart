@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-import 'package:optima_ml/nucleo/tema.dart';
-import 'package:optima_ml/nucleo/extensiones.dart';
-import 'package:optima_ml/nucleo/proveedor_estado.dart';
+import 'package:iheart/nucleo/tema.dart';
+import 'package:iheart/nucleo/extensiones.dart';
+import 'package:iheart/nucleo/proveedor_estado.dart';
 
 class PantallaAjustes extends StatefulWidget {
   final ValueChanged<int>? alCambiarTab;

@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-import 'package:optima_ml/nucleo/tema.dart';
-import 'package:optima_ml/nucleo/extensiones.dart';
-import 'package:optima_ml/nucleo/proveedor_estado.dart';
-import 'package:optima_ml/datos/repositorio_diagnosticos.dart';
-import 'package:optima_ml/datos/repositorio_sesiones.dart';
-import 'package:optima_ml/modelo/feature_engineering.dart';
-import 'package:optima_ml/modelo/inferencia_local.dart';
-import 'package:optima_ml/widgets/boton_primario.dart';
+import 'package:iheart/nucleo/tema.dart';
+import 'package:iheart/nucleo/extensiones.dart';
+import 'package:iheart/nucleo/proveedor_estado.dart';
+import 'package:iheart/datos/repositorio_diagnosticos.dart';
+import 'package:iheart/datos/repositorio_sesiones.dart';
+import 'package:iheart/modelo/feature_engineering.dart';
+import 'package:iheart/modelo/inferencia_local.dart';
+import 'package:iheart/widgets/boton_primario.dart';
 
 class PantallaCuestionario extends StatefulWidget {
   const PantallaCuestionario({super.key});

@@ -1,6 +1,6 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:optima_ml/datos/base_datos_local.dart';
-import 'package:optima_ml/nucleo/constantes.dart';
+import 'package:iheart/datos/base_datos_local.dart';
+import 'package:iheart/nucleo/constantes.dart';
 import 'package:sqflite/sqflite.dart';
 
 class PerfilPaciente {

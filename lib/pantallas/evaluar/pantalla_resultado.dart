@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:optima_ml/nucleo/tema.dart';
-import 'package:optima_ml/widgets/boton_primario.dart';
-import 'package:optima_ml/widgets/tarjeta_riesgo.dart';
+import 'package:iheart/nucleo/tema.dart';
+import 'package:iheart/widgets/boton_primario.dart';
+import 'package:iheart/widgets/tarjeta_riesgo.dart';
 
 class PantallaResultado extends StatelessWidget {
   final double probabilidadRiesgo;

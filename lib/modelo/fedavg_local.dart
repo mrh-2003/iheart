@@ -1,6 +1,6 @@
 import 'dart:math';
-import 'package:optima_ml/datos/repositorio_diagnosticos.dart';
-import 'package:optima_ml/datos/repositorio_modelo.dart';
+import 'package:iheart/datos/repositorio_diagnosticos.dart';
+import 'package:iheart/datos/repositorio_modelo.dart';
 
 class FedAvgLocal {
   static final FedAvgLocal instancia = FedAvgLocal._interna();

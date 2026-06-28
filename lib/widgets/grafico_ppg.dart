@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:optima_ml/nucleo/tema.dart';
+import 'package:iheart/nucleo/tema.dart';
 
 class GraficoPPG extends StatefulWidget {
   final bool interactivo;

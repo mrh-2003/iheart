@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:optima_ml/nucleo/constantes.dart';
-import 'package:optima_ml/modelo/inferencia_local.dart';
-import 'package:optima_ml/pantallas/auth/pantalla_login.dart';
-import 'package:optima_ml/pantallas/auth/pantalla_registro.dart';
-import 'package:optima_ml/pantallas/auth/pantalla_recuperar.dart';
-import 'package:optima_ml/pantallas/inicio/pantalla_inicio.dart';
-import 'package:optima_ml/pantallas/evaluar/pantalla_calibracion.dart';
-import 'package:optima_ml/pantallas/evaluar/pantalla_cuestionario.dart';
-import 'package:optima_ml/pantallas/evaluar/pantalla_resultado.dart';
-import 'package:optima_ml/pantallas/historial/pantalla_diagnostico_detalle.dart';
-import 'package:optima_ml/pantallas/ajustes/pantalla_iot.dart';
-import 'package:optima_ml/pantallas/ajustes/pantalla_modelo_fl.dart';
+import 'package:iheart/nucleo/constantes.dart';
+import 'package:iheart/modelo/inferencia_local.dart';
+import 'package:iheart/pantallas/auth/pantalla_login.dart';
+import 'package:iheart/pantallas/auth/pantalla_registro.dart';
+import 'package:iheart/pantallas/auth/pantalla_recuperar.dart';
+import 'package:iheart/pantallas/inicio/pantalla_inicio.dart';
+import 'package:iheart/pantallas/evaluar/pantalla_calibracion.dart';
+import 'package:iheart/pantallas/evaluar/pantalla_cuestionario.dart';
+import 'package:iheart/pantallas/evaluar/pantalla_resultado.dart';
+import 'package:iheart/pantallas/historial/pantalla_diagnostico_detalle.dart';
+import 'package:iheart/pantallas/ajustes/pantalla_iot.dart';
+import 'package:iheart/pantallas/ajustes/pantalla_modelo_fl.dart';
 
 final GoRouter rutasApp = GoRouter(
   initialLocation: '/',

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-import 'package:optima_ml/nucleo/tema.dart';
-import 'package:optima_ml/nucleo/extensiones.dart';
-import 'package:optima_ml/nucleo/proveedor_estado.dart';
-import 'package:optima_ml/widgets/boton_primario.dart';
-import 'package:optima_ml/widgets/grafico_ppg.dart';
-import 'package:optima_ml/widgets/tarjeta_sesion.dart';
+import 'package:iheart/nucleo/tema.dart';
+import 'package:iheart/nucleo/extensiones.dart';
+import 'package:iheart/nucleo/proveedor_estado.dart';
+import 'package:iheart/widgets/boton_primario.dart';
+import 'package:iheart/widgets/grafico_ppg.dart';
+import 'package:iheart/widgets/tarjeta_sesion.dart';
 
 class PantallaHistorial extends StatelessWidget {
   const PantallaHistorial({super.key});

@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:optima_ml/nucleo/tema.dart';
-import 'package:optima_ml/nucleo/extensiones.dart';
-import 'package:optima_ml/widgets/boton_primario.dart';
+import 'package:iheart/nucleo/tema.dart';
+import 'package:iheart/nucleo/extensiones.dart';
+import 'package:iheart/widgets/boton_primario.dart';
 
 class PantallaIoT extends StatefulWidget {
   const PantallaIoT({super.key});

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:optima_ml/nucleo/tema.dart';
-import 'package:optima_ml/nucleo/proveedor_estado.dart';
+import 'package:iheart/nucleo/tema.dart';
+import 'package:iheart/nucleo/proveedor_estado.dart';
 
 class PantallaDiagnosticoDetalle extends StatelessWidget {
   final int diagnosticoId;

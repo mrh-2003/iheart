@@ -1,14 +1,14 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:optima_ml/datos/repositorio_perfil.dart';
-import 'package:optima_ml/datos/repositorio_sesiones.dart';
-import 'package:optima_ml/datos/repositorio_diagnosticos.dart';
-import 'package:optima_ml/datos/repositorio_modelo.dart';
-import 'package:optima_ml/red/servicio_auth.dart';
-import 'package:optima_ml/red/servicio_modelo.dart';
-import 'package:optima_ml/red/servicio_federado.dart';
-import 'package:optima_ml/modelo/inferencia_local.dart';
-import 'package:optima_ml/modelo/fedavg_local.dart';
+import 'package:iheart/datos/repositorio_perfil.dart';
+import 'package:iheart/datos/repositorio_sesiones.dart';
+import 'package:iheart/datos/repositorio_diagnosticos.dart';
+import 'package:iheart/datos/repositorio_modelo.dart';
+import 'package:iheart/red/servicio_auth.dart';
+import 'package:iheart/red/servicio_modelo.dart';
+import 'package:iheart/red/servicio_federado.dart';
+import 'package:iheart/modelo/inferencia_local.dart';
+import 'package:iheart/modelo/fedavg_local.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 
