@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:iheart/nucleo/tema.dart';
 import 'package:iheart/nucleo/extensiones.dart';
 import 'package:iheart/nucleo/proveedor_estado.dart';
@@ -80,6 +82,23 @@ class PantallaHistorial extends StatelessWidget {
     }
 
     try {
+      if (Platform.isAndroid) {
+        final statusStorage = await Permission.storage.status;
+        final statusManage = await Permission.manageExternalStorage.status;
+        if (!statusStorage.isGranted && !statusManage.isGranted) {
+          final resStorage = await Permission.storage.request();
+          final resManage = await Permission.manageExternalStorage.request();
+          if (!resStorage.isGranted && !resManage.isGranted) {
+            if (contexto.mounted) {
+              contexto.mostrarMensajeError(
+                'Permiso de almacenamiento denegado.',
+              );
+            }
+            return;
+          }
+        }
+      }
+
       final carpetaSeleccionada = await FilePicker.platform.getDirectoryPath(
         dialogTitle: 'Elegir carpeta de destino para el CSV',
       );
@@ -95,14 +114,45 @@ class PantallaHistorial extends StatelessWidget {
           'iheart_historial_${ahora.year}${ahora.month.toString().padLeft(2, '0')}${ahora.day.toString().padLeft(2, '0')}_'
           '${ahora.hour.toString().padLeft(2, '0')}${ahora.minute.toString().padLeft(2, '0')}.csv';
 
-      final ruta = '$carpetaSeleccionada${Platform.pathSeparator}$nombreArchivo';
-      final archivo = File(ruta);
-      await archivo.writeAsString(contenidoCsv, flush: true);
+      String rutaFinal;
+      bool usadoRutaSegura = false;
+
+      try {
+        final ruta = '$carpetaSeleccionada${Platform.pathSeparator}$nombreArchivo';
+        final archivo = File(ruta);
+        await archivo.writeAsString(contenidoCsv, flush: true);
+        rutaFinal = ruta;
+      } catch (_) {
+        usadoRutaSegura = true;
+        final dirs = await getExternalStorageDirectories(
+          type: StorageDirectory.downloads,
+        );
+        if (dirs != null && dirs.isNotEmpty) {
+          final rutaSegura =
+              '${dirs.first.path}${Platform.pathSeparator}$nombreArchivo';
+          final archivoSeguro = File(rutaSegura);
+          await archivoSeguro.writeAsString(contenidoCsv, flush: true);
+          rutaFinal = rutaSegura;
+        } else {
+          final dirDoc = await getApplicationDocumentsDirectory();
+          final rutaSegura =
+              '${dirDoc.path}${Platform.pathSeparator}$nombreArchivo';
+          final archivoSeguro = File(rutaSegura);
+          await archivoSeguro.writeAsString(contenidoCsv, flush: true);
+          rutaFinal = rutaSegura;
+        }
+      }
 
       if (contexto.mounted) {
-        contexto.mostrarMensajeExito(
-          'Historial exportado: $nombreArchivo (${sesiones.length} sesiones)',
-        );
+        if (usadoRutaSegura) {
+          contexto.mostrarMensajeExito(
+            'Guardado por seguridad en: $rutaFinal',
+          );
+        } else {
+          contexto.mostrarMensajeExito(
+            'Historial exportado: $nombreArchivo',
+          );
+        }
       }
     } catch (e) {
       if (contexto.mounted) {

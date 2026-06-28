@@ -1,5 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:health/health.dart';
 import 'package:iheart/nucleo/tema.dart';
 import 'package:iheart/nucleo/proveedor_estado.dart';
 import 'package:iheart/widgets/boton_primario.dart';
@@ -31,6 +34,29 @@ class _PantallaInicioState extends State<PantallaInicio> {
   void initState() {
     super.initState();
     _indiceSeleccionado = widget.indiceInicial;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _solicitarTodosLosPermisos();
+    });
+  }
+
+  Future<void> _solicitarTodosLosPermisos() async {
+    try {
+      await Permission.notification.request();
+      await [
+        Permission.bluetoothScan,
+        Permission.bluetoothConnect,
+        Permission.location,
+      ].request();
+      if (Platform.isAndroid) {
+        await Permission.storage.request();
+        await Permission.manageExternalStorage.request();
+      }
+      final health = Health();
+      final disponible = await health.isHealthConnectAvailable();
+      if (disponible) {
+        await health.requestAuthorization(const [HealthDataType.HEART_RATE]);
+      }
+    } catch (_) {}
   }
 
   String _obtenerTituloTab(int indice) {
