@@ -51,7 +51,19 @@ class ClienteApi {
     try {
       final datos = jsonDecode(cuerpo);
       if (datos is Map && datos.containsKey('detail')) {
-        return datos['detail'].toString();
+        final detalle = datos['detail'];
+        if (detalle is List) {
+          final mensajes = <String>[];
+          for (final item in detalle) {
+            if (item is Map && item.containsKey('msg')) {
+              mensajes.add(item['msg'].toString());
+            } else {
+              mensajes.add(item.toString());
+            }
+          }
+          return mensajes.join(', ');
+        }
+        return detalle.toString();
       }
     } catch (_) {}
     return null;
@@ -110,29 +122,47 @@ class SocketException implements Exception {}
 class ErrorAutenticacionException implements Exception {
   final String mensaje;
   ErrorAutenticacionException(this.mensaje);
+
+  @override
+  String toString() => mensaje;
 }
 
 class ErrorConflictoException implements Exception {
   final String mensaje;
   ErrorConflictoException(this.mensaje);
+
+  @override
+  String toString() => mensaje;
 }
 
 class ErrorNoEncontradoException implements Exception {
   final String mensaje;
   ErrorNoEncontradoException(this.mensaje);
+
+  @override
+  String toString() => mensaje;
 }
 
 class ErrorValidacionException implements Exception {
   final String mensaje;
   ErrorValidacionException(this.mensaje);
+
+  @override
+  String toString() => mensaje;
 }
 
 class ErrorServidorException implements Exception {
   final String mensaje;
   ErrorServidorException(this.mensaje);
+
+  @override
+  String toString() => mensaje;
 }
 
 class ErrorConexionException implements Exception {
   final String mensaje;
   ErrorConexionException(this.mensaje);
+
+  @override
+  String toString() => mensaje;
 }
