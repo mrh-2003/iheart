@@ -45,6 +45,7 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
         numeroDni: _controladorDni.text,
         correo: _controladorCorreo.text,
         contrasena: _controladorContrasena.text,
+        confirmarContrasena: _controladorConfirmar.text,
       );
       if (mounted) {
         context.mostrarMensajeExito('Cuenta registrada con éxito. Inicie sesión.');

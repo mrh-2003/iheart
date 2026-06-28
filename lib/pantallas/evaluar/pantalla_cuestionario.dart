@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:health/health.dart';
 import 'package:iheart/nucleo/tema.dart';
 import 'package:iheart/nucleo/extensiones.dart';
 import 'package:iheart/nucleo/proveedor_estado.dart';
@@ -19,9 +20,11 @@ class PantallaCuestionario extends StatefulWidget {
 
 class _PantallaCuestionarioState extends State<PantallaCuestionario> {
   final _formularioClave = GlobalKey<FormState>();
-  final _controladorFrecuencia = TextEditingController(text: '72');
+  final _controladorFrecuencia = TextEditingController();
 
-  // Factores Clínicos (Enfermedades)
+  bool _cargandoHealthConnect = false;
+  String? _fuenteFrecuencia;
+
   bool _diabetes = false;
   bool _hipertension = false;
   bool _accidenteCerebrovascular = false;
@@ -31,20 +34,17 @@ class _PantallaCuestionarioState extends State<PantallaCuestionario> {
   bool _insuficienciaCardiaca = false;
   bool _dislipidemia = false;
 
-  // Toggles de Sí/No
   bool _obesidad = false;
   bool _antecedenteFamiliar = false;
   bool _edema = false;
   bool _disnea = false;
   bool _esfuerzoFisico = false;
 
-  // Tabaquismo
-  String _estadoTabaco = 'no_fumador'; // no_fumador, activo, ex_fumador
+  String _estadoTabaco = 'no_fumador';
 
-  // Dolor en el pecho
   bool _dolorPecho = false;
-  int _frecuenciaDolor = 0; // 0-5
-  String _tipoDolor = 'tipico'; // tipico, atipico, no_anginoso
+  int _frecuenciaDolor = 0;
+  String _tipoDolor = 'tipico';
 
   @override
   void dispose() {
@@ -52,13 +52,75 @@ class _PantallaCuestionarioState extends State<PantallaCuestionario> {
     super.dispose();
   }
 
-  void _simularFrecuenciaCardiaca() {
-    // Simula una lectura desde wearable IoT o Health Connect
-    final valorSimulado = 60 + (DateTime.now().millisecond % 40);
-    setState(() {
-      _controladorFrecuencia.text = valorSimulado.toString();
-    });
-    context.mostrarMensajeExito('Frecuencia cardíaca actualizada desde sensor: $valorSimulado bpm');
+  Future<void> _leerFrecuenciaDesdeHealthConnect() async {
+    setState(() => _cargandoHealthConnect = true);
+
+    try {
+      final health = Health();
+      final tipos = [HealthDataType.HEART_RATE];
+      final permisoConcedido = await health.requestAuthorization(tipos);
+
+      if (!permisoConcedido) {
+        if (mounted) {
+          context.mostrarMensajeError(
+            'Se requiere permiso de Health Connect para leer la frecuencia cardíaca.',
+          );
+        }
+        return;
+      }
+
+      final ahora = DateTime.now();
+      final hace6Horas = ahora.subtract(const Duration(hours: 6));
+      final datos = await health.getHealthDataFromTypes(
+        types: tipos,
+        startTime: hace6Horas,
+        endTime: ahora,
+      );
+
+      if (datos.isEmpty) {
+        if (mounted) {
+          context.mostrarMensajeError(
+            'No se encontró frecuencia cardíaca reciente en Health Connect. Ingrese el valor manualmente.',
+          );
+        }
+        return;
+      }
+
+      final lecturaReciente = datos.last;
+      final valorNumerico = lecturaReciente.value;
+      double? bpm;
+
+      if (valorNumerico is NumericHealthValue) {
+        bpm = valorNumerico.numericValue.toDouble();
+      }
+
+      if (bpm == null || bpm <= 0) {
+        if (mounted) {
+          context.mostrarMensajeError(
+            'El valor leído no es válido. Ingrese la frecuencia manualmente.',
+          );
+        }
+        return;
+      }
+
+      if (mounted) {
+        setState(() {
+          _controladorFrecuencia.text = bpm!.toStringAsFixed(0);
+          _fuenteFrecuencia = lecturaReciente.sourceName;
+        });
+        context.mostrarMensajeExito(
+          'Frecuencia cardíaca obtenida de Health Connect: ${bpm.toStringAsFixed(0)} bpm',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        context.mostrarMensajeError(
+          'Error al leer Health Connect: ${e.toString()}',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _cargandoHealthConnect = false);
+    }
   }
 
   Future<void> _ejecutarDiagnostico() async {
@@ -71,7 +133,13 @@ class _PantallaCuestionarioState extends State<PantallaCuestionario> {
       return;
     }
 
-    final double ritmoCardiaco = double.tryParse(_controladorFrecuencia.text) ?? 72.0;
+    final double? ritmoCardiaco = double.tryParse(_controladorFrecuencia.text);
+    if (ritmoCardiaco == null || ritmoCardiaco <= 0) {
+      context.mostrarMensajeError(
+        'Ingrese una frecuencia cardíaca válida antes de continuar.',
+      );
+      return;
+    }
 
     final cuestionario = CuestionarioClinico(
       tieneDiabetes: _diabetes,
@@ -89,7 +157,9 @@ class _PantallaCuestionarioState extends State<PantallaCuestionario> {
       presentaEdema: _edema,
       presentaDolorPecho: _dolorPecho,
       frecuenciaDolorPecho: _dolorPecho ? _frecuenciaDolor : 0,
-      clasificacionDolor: _dolorPecho ? (_tipoDolor == 'tipico' ? 2 : (_tipoDolor == 'atipico' ? 1 : 0)) : 0,
+      clasificacionDolor: _dolorPecho
+          ? (_tipoDolor == 'tipico' ? 2 : (_tipoDolor == 'atipico' ? 1 : 0))
+          : 0,
       tipoDolor: _dolorPecho ? _tipoDolor : null,
       esfuerzoFisicoReciente: _esfuerzoFisico,
       disnea: _disnea,
@@ -97,32 +167,24 @@ class _PantallaCuestionarioState extends State<PantallaCuestionario> {
     );
 
     final sesion = SesionMonitoreo(
-      tipo: 'manual',
+      tipo: _fuenteFrecuencia != null ? 'health_connect' : 'manual',
       bpmPromedio: ritmoCardiaco,
-      bpmMinimo: ritmoCardiaco - 5,
-      bpmMaximo: ritmoCardiaco + 10,
-      spo2Promedio: 98.0,
-      hrvMs: 45.0,
-      ritmoTipo: 'regular',
-      calidadSenal: 'alta',
-      fuente: 'manual',
-      dispositivoNombre: 'Ingreso Manual',
-      duracionSegundos: 60,
+      fuente: _fuenteFrecuencia ?? 'manual',
+      dispositivoNombre: _fuenteFrecuencia ?? 'Ingreso manual del paciente',
+      duracionSegundos: 0,
       iniciadoEn: DateTime.now().toIso8601String(),
     );
 
     try {
-      // 1. Generar features de entrada
       final features = FeatureEngineering.generarFeatures(
         perfil: perfil,
         cuestionario: cuestionario,
         ritmoCardiaco: ritmoCardiaco,
       );
 
-      // 2. Ejecutar inferencia local con TFLite
-      final probabilidad = await InferenciaLocal.instancia.ejecutarInferencia(features);
+      final probabilidad =
+          await InferenciaLocal.instancia.ejecutarInferencia(features);
 
-      // 3. Determinar severidad del riesgo
       String nivelRiesgo = 'bajo';
       if (probabilidad > 0.8) {
         nivelRiesgo = 'crítico';
@@ -134,7 +196,6 @@ class _PantallaCuestionarioState extends State<PantallaCuestionario> {
 
       final etiqueta = probabilidad >= 0.5 ? 'CAD' : 'Normal';
 
-      // 4. Guardar diagnóstico y sesión localmente
       await estado.registrarDiagnosticoCompleto(
         sesion: sesion,
         cuestionario: cuestionario,
@@ -152,7 +213,8 @@ class _PantallaCuestionarioState extends State<PantallaCuestionario> {
       }
     } catch (e) {
       if (mounted) {
-        context.mostrarMensajeError('Error al ejecutar diagnóstico: ${e.toString()}');
+        context.mostrarMensajeError(
+            'Error al ejecutar diagnóstico: ${e.toString()}');
       }
     }
   }
@@ -181,8 +243,7 @@ class _PantallaCuestionarioState extends State<PantallaCuestionario> {
                 ),
               ),
               const SizedBox(height: 24),
-              
-              // Frecuencia Cardíaca
+
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -191,6 +252,7 @@ class _PantallaCuestionarioState extends State<PantallaCuestionario> {
                   border: Border.all(color: TemaApp.grisBorde),
                 ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
@@ -199,52 +261,124 @@ class _PantallaCuestionarioState extends State<PantallaCuestionario> {
                         const Expanded(
                           child: Text(
                             'Frecuencia Cardíaca (BPM)',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 14),
                           ),
                         ),
                         SizedBox(
-                          width: 80,
+                          width: 90,
                           child: TextFormField(
                             controller: _controladorFrecuencia,
                             keyboardType: TextInputType.number,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 16),
                             decoration: const InputDecoration(
-                              contentPadding: EdgeInsets.symmetric(vertical: 4),
+                              hintText: '— bpm',
+                              contentPadding:
+                                  EdgeInsets.symmetric(vertical: 4),
                               border: UnderlineInputBorder(),
                             ),
                             validator: (valor) {
-                              if (valor == null || valor.isEmpty) return 'Requerido';
-                              if (int.tryParse(valor) == null) return 'Inválido';
+                              if (valor == null || valor.isEmpty) {
+                                return 'Requerido';
+                              }
+                              final parsed = double.tryParse(valor);
+                              if (parsed == null || parsed <= 0) {
+                                return 'Inválido';
+                              }
                               return null;
                             },
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    ElevatedButton.icon(
-                      onPressed: _simularFrecuenciaCardiaca,
-                      icon: const Icon(Icons.refresh, size: 18),
-                      label: const Text('Registrar Frecuencia'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: TemaApp.rojoPrimario,
-                        foregroundColor: TemaApp.blancoFondo,
-                        elevation: 0,
+                    if (_fuenteFrecuencia != null) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          const Icon(Icons.check_circle_outline,
+                              color: TemaApp.verdeExito, size: 14),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'Fuente: $_fuenteFrecuencia',
+                              style: const TextStyle(
+                                  fontSize: 12,
+                                  color: TemaApp.verdeExito),
+                            ),
+                          ),
+                        ],
                       ),
+                    ],
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _cargandoHealthConnect
+                                ? null
+                                : _leerFrecuenciaDesdeHealthConnect,
+                            icon: _cargandoHealthConnect
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: TemaApp.rojoPrimario,
+                                    ),
+                                  )
+                                : const Icon(Icons.watch_outlined, size: 18),
+                            label: Text(_cargandoHealthConnect
+                                ? 'Leyendo...'
+                                : 'Desde Health Connect'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: TemaApp.rojoPrimario,
+                              side: const BorderSide(
+                                  color: TemaApp.rojoPrimario),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                _controladorFrecuencia.clear();
+                                _fuenteFrecuencia = null;
+                              });
+                            },
+                            icon: const Icon(Icons.edit_outlined, size: 18),
+                            label: const Text('Ingresar manualmente'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: TemaApp.textoSecundario,
+                              side:
+                                  const BorderSide(color: TemaApp.grisBorde),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Puede obtener el dato desde Health Connect (Xiaomi Smart Band 10 / Mi Fitness) o ingresarlo manualmente.',
+                      style: TextStyle(
+                          fontSize: 11, color: TemaApp.textoSecundario),
                     ),
                   ],
                 ),
               ),
-              
+
               const SizedBox(height: 24),
               const Text(
                 'Enfermedades preexistentes',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: TemaApp.textoOscuro),
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: TemaApp.textoOscuro),
               ),
               const SizedBox(height: 12),
-              
-              // Checkboxes de enfermedades
+
               CheckboxListTile(
                 title: const Text('Diabetes Mellitus'),
                 value: _diabetes,
@@ -257,7 +391,8 @@ class _PantallaCuestionarioState extends State<PantallaCuestionario> {
                 title: const Text('Hipertensión Arterial'),
                 value: _hipertension,
                 activeColor: TemaApp.rojoPrimario,
-                onChanged: (val) => setState(() => _hipertension = val ?? false),
+                onChanged: (val) =>
+                    setState(() => _hipertension = val ?? false),
                 controlAffinity: ListTileControlAffinity.leading,
                 contentPadding: EdgeInsets.zero,
               ),
@@ -265,7 +400,8 @@ class _PantallaCuestionarioState extends State<PantallaCuestionario> {
                 title: const Text('Accidente Cerebrovascular (ACV)'),
                 value: _accidenteCerebrovascular,
                 activeColor: TemaApp.rojoPrimario,
-                onChanged: (val) => setState(() => _accidenteCerebrovascular = val ?? false),
+                onChanged: (val) => setState(
+                    () => _accidenteCerebrovascular = val ?? false),
                 controlAffinity: ListTileControlAffinity.leading,
                 contentPadding: EdgeInsets.zero,
               ),
@@ -273,7 +409,8 @@ class _PantallaCuestionarioState extends State<PantallaCuestionario> {
                 title: const Text('Insuficiencia Renal Crónica'),
                 value: _insuficienciaRenal,
                 activeColor: TemaApp.rojoPrimario,
-                onChanged: (val) => setState(() => _insuficienciaRenal = val ?? false),
+                onChanged: (val) =>
+                    setState(() => _insuficienciaRenal = val ?? false),
                 controlAffinity: ListTileControlAffinity.leading,
                 contentPadding: EdgeInsets.zero,
               ),
@@ -281,7 +418,8 @@ class _PantallaCuestionarioState extends State<PantallaCuestionario> {
                 title: const Text('Enfermedad respiratoria crónica'),
                 value: _enfermedadRespiratoria,
                 activeColor: TemaApp.rojoPrimario,
-                onChanged: (val) => setState(() => _enfermedadRespiratoria = val ?? false),
+                onChanged: (val) =>
+                    setState(() => _enfermedadRespiratoria = val ?? false),
                 controlAffinity: ListTileControlAffinity.leading,
                 contentPadding: EdgeInsets.zero,
               ),
@@ -289,7 +427,8 @@ class _PantallaCuestionarioState extends State<PantallaCuestionario> {
                 title: const Text('Enfermedad tiroidea'),
                 value: _enfermedadTiroidea,
                 activeColor: TemaApp.rojoPrimario,
-                onChanged: (val) => setState(() => _enfermedadTiroidea = val ?? false),
+                onChanged: (val) =>
+                    setState(() => _enfermedadTiroidea = val ?? false),
                 controlAffinity: ListTileControlAffinity.leading,
                 contentPadding: EdgeInsets.zero,
               ),
@@ -297,7 +436,8 @@ class _PantallaCuestionarioState extends State<PantallaCuestionario> {
                 title: const Text('Insuficiencia Cardíaca Congestiva'),
                 value: _insuficienciaCardiaca,
                 activeColor: TemaApp.rojoPrimario,
-                onChanged: (val) => setState(() => _insuficienciaCardiaca = val ?? false),
+                onChanged: (val) =>
+                    setState(() => _insuficienciaCardiaca = val ?? false),
                 controlAffinity: ListTileControlAffinity.leading,
                 contentPadding: EdgeInsets.zero,
               ),
@@ -305,7 +445,8 @@ class _PantallaCuestionarioState extends State<PantallaCuestionario> {
                 title: const Text('Dislipidemia'),
                 value: _dislipidemia,
                 activeColor: TemaApp.rojoPrimario,
-                onChanged: (val) => setState(() => _dislipidemia = val ?? false),
+                onChanged: (val) =>
+                    setState(() => _dislipidemia = val ?? false),
                 controlAffinity: ListTileControlAffinity.leading,
                 contentPadding: EdgeInsets.zero,
               ),
@@ -313,11 +454,13 @@ class _PantallaCuestionarioState extends State<PantallaCuestionario> {
               const SizedBox(height: 24),
               const Text(
                 'Hábitos y Síntomas',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: TemaApp.textoOscuro),
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: TemaApp.textoOscuro),
               ),
               const SizedBox(height: 16),
 
-              // Tabaquismo Dropdown
               DropdownButtonFormField<String>(
                 value: _estadoTabaco,
                 decoration: const InputDecoration(
@@ -326,15 +469,21 @@ class _PantallaCuestionarioState extends State<PantallaCuestionario> {
                   fillColor: TemaApp.grisSuperficie,
                 ),
                 items: const [
-                  DropdownMenuItem(value: 'no_fumador', child: Text('No fumo / Nunca he fumado')),
-                  DropdownMenuItem(value: 'activo', child: Text('Soy fumador activo')),
-                  DropdownMenuItem(value: 'ex_fumador', child: Text('He dejado de fumar (Ex-fumador)')),
+                  DropdownMenuItem(
+                      value: 'no_fumador',
+                      child: Text('No fumo / Nunca he fumado')),
+                  DropdownMenuItem(
+                      value: 'activo',
+                      child: Text('Soy fumador activo')),
+                  DropdownMenuItem(
+                      value: 'ex_fumador',
+                      child: Text('He dejado de fumar (Ex-fumador)')),
                 ],
-                onChanged: (val) => setState(() => _estadoTabaco = val ?? 'no_fumador'),
+                onChanged: (val) =>
+                    setState(() => _estadoTabaco = val ?? 'no_fumador'),
               ),
               const SizedBox(height: 24),
 
-              // Toggles
               SwitchListTile(
                 title: const Text('¿Tiene obesidad?'),
                 value: _obesidad,
@@ -345,7 +494,8 @@ class _PantallaCuestionarioState extends State<PantallaCuestionario> {
                 title: const Text('¿Familiar con enfermedad coronaria prematura?'),
                 value: _antecedenteFamiliar,
                 activeColor: TemaApp.rojoPrimario,
-                onChanged: (val) => setState(() => _antecedenteFamiliar = val),
+                onChanged: (val) =>
+                    setState(() => _antecedenteFamiliar = val),
               ),
               SwitchListTile(
                 title: const Text('¿Presenta Edema (hinchazón de piernas)?'),
@@ -365,16 +515,15 @@ class _PantallaCuestionarioState extends State<PantallaCuestionario> {
                 activeColor: TemaApp.rojoPrimario,
                 onChanged: (val) => setState(() => _esfuerzoFisico = val),
               ),
-              
+
               const SizedBox(height: 24),
-              // Dolor en el pecho
               SwitchListTile(
                 title: const Text('¿Presenta dolor en el pecho?'),
                 value: _dolorPecho,
                 activeColor: TemaApp.rojoPrimario,
                 onChanged: (val) => setState(() => _dolorPecho = val),
               ),
-              
+
               if (_dolorPecho) ...[
                 const SizedBox(height: 16),
                 Text(
@@ -388,7 +537,8 @@ class _PantallaCuestionarioState extends State<PantallaCuestionario> {
                   divisions: 5,
                   label: _frecuenciaDolor.toString(),
                   activeColor: TemaApp.rojoPrimario,
-                  onChanged: (val) => setState(() => _frecuenciaDolor = val.toInt()),
+                  onChanged: (val) =>
+                      setState(() => _frecuenciaDolor = val.toInt()),
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
@@ -399,11 +549,18 @@ class _PantallaCuestionarioState extends State<PantallaCuestionario> {
                     fillColor: TemaApp.grisSuperficie,
                   ),
                   items: const [
-                    DropdownMenuItem(value: 'tipico', child: Text('Dolor típico anginoso')),
-                    DropdownMenuItem(value: 'atipico', child: Text('Dolor atípico')),
-                    DropdownMenuItem(value: 'no_anginoso', child: Text('Dolor no anginoso')),
+                    DropdownMenuItem(
+                        value: 'tipico',
+                        child: Text('Dolor típico anginoso')),
+                    DropdownMenuItem(
+                        value: 'atipico',
+                        child: Text('Dolor atípico')),
+                    DropdownMenuItem(
+                        value: 'no_anginoso',
+                        child: Text('Dolor no anginoso')),
                   ],
-                  onChanged: (val) => setState(() => _tipoDolor = val ?? 'tipico'),
+                  onChanged: (val) =>
+                      setState(() => _tipoDolor = val ?? 'tipico'),
                 ),
               ],
 

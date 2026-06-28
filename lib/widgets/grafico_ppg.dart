@@ -1,7 +1,6 @@
-import 'dart:async';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:health/health.dart';
 import 'package:iheart/nucleo/tema.dart';
 
 class GraficoPPG extends StatefulWidget {
@@ -17,91 +16,313 @@ class GraficoPPG extends StatefulWidget {
 }
 
 class _GraficoPPGState extends State<GraficoPPG> {
-  final List<FlSpot> _puntos = [];
-  Timer? _temporizador;
-  double _contadorX = 0;
+  List<FlSpot> _puntos = [];
+  bool _cargando = true;
+  String? _error;
+  DateTime? _inicioRango;
+  DateTime? _finRango;
 
   @override
   void initState() {
     super.initState();
-    _generarPuntosIniciales();
-    if (widget.interactivo) {
-      _iniciarAnimacion();
-    }
+    _cargarDatosHealthConnect();
   }
 
-  @override
-  void dispose() {
-    _temporizador?.cancel();
-    super.dispose();
-  }
+  Future<void> _cargarDatosHealthConnect() async {
+    try {
+      final health = Health();
+      final tipos = [HealthDataType.HEART_RATE];
+      final permisoConcedido = await health.requestAuthorization(tipos);
 
-  void _generarPuntosIniciales() {
-    for (double i = 0; i < 50; i += 1) {
-      _puntos.add(FlSpot(i, _calcularValorOnda(i)));
-    }
-    _contadorX = 49;
-  }
+      if (!permisoConcedido) {
+        if (mounted) {
+          setState(() {
+            _error = 'Permiso de Health Connect no concedido.';
+            _cargando = false;
+          });
+        }
+        return;
+      }
 
-  void _iniciarAnimacion() {
-    _temporizador = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+      final ahora = DateTime.now();
+      final hace6Horas = ahora.subtract(const Duration(hours: 6));
+      final datos = await health.getHealthDataFromTypes(
+        types: tipos,
+        startTime: hace6Horas,
+        endTime: ahora,
+      );
+
       if (!mounted) return;
+
+      if (datos.isEmpty) {
+        setState(() {
+          _error = 'Sin datos de ritmo cardíaco en las últimas 6 horas.';
+          _cargando = false;
+        });
+        return;
+      }
+
+      datos.sort((a, b) => a.dateFrom.compareTo(b.dateFrom));
+
+      final baseMs = datos.first.dateFrom.millisecondsSinceEpoch.toDouble();
+      final nuevos = <FlSpot>[];
+
+      for (final punto in datos) {
+        if (punto.value is NumericHealthValue) {
+          final bpm =
+              (punto.value as NumericHealthValue).numericValue.toDouble();
+          if (bpm > 0 && bpm < 300) {
+            final xMin =
+                (punto.dateFrom.millisecondsSinceEpoch - baseMs) / 60000.0;
+            nuevos.add(FlSpot(xMin, bpm));
+          }
+        }
+      }
+
+      if (nuevos.isEmpty) {
+        setState(() {
+          _error = 'Los datos disponibles no contienen valores de BPM válidos.';
+          _cargando = false;
+        });
+        return;
+      }
+
       setState(() {
-        _contadorX += 1;
-        _puntos.removeAt(0);
-        _puntos.add(FlSpot(_contadorX, _calcularValorOnda(_contadorX)));
+        _puntos = nuevos;
+        _inicioRango = datos.first.dateFrom;
+        _finRango = datos.last.dateFrom;
+        _cargando = false;
+        _error = null;
       });
-    });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = 'Error al leer Health Connect: ${e.toString()}';
+          _cargando = false;
+        });
+      }
+    }
   }
 
-  double _calcularValorOnda(double x) {
-    // Simula una señal PPG (Pletismografía) con sístole, dicrotismo y diástole
-    final double periodo = x % 20;
-    if (periodo < 5) {
-      // Subida rápida (onda sistólica)
-      return sin((periodo / 5) * pi / 2) * 8 + 2;
-    } else if (periodo < 9) {
-      // Bajada inicial
-      return cos(((periodo - 5) / 4) * pi / 3) * 5 + 5;
-    } else if (periodo < 11) {
-      // Muesca dicrota
-      return sin(((periodo - 9) / 2) * pi) * 1.5 + 4.5;
-    } else {
-      // Descenso diastólico lento
-      return ((20 - periodo) / 9) * 3 + 1.5;
-    }
+  String _formatearEtiquetaX(double minutosDesdeInicio) {
+    if (_inicioRango == null) return '';
+    final momento =
+        _inicioRango!.add(Duration(minutes: minutosDesdeInicio.toInt()));
+    final h = momento.hour.toString().padLeft(2, '0');
+    final m = momento.minute.toString().padLeft(2, '0');
+    return '$h:$m';
   }
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 160,
-      child: LineChart(
-        LineChartData(
-          gridData: const FlGridData(show: false),
-          titlesData: const FlTitlesData(show: false),
-          borderData: FlBorderData(show: false),
-          minX: _puntos.isEmpty ? 0 : _puntos.first.x,
-          maxX: _puntos.isEmpty ? 50 : _puntos.last.x,
-          minY: 0,
-          maxY: 12,
-          lineTouchData: const LineTouchData(enabled: false),
-          lineBarsData: [
-            LineChartBarData(
-              spots: _puntos,
-              isCurved: true,
-              color: TemaApp.rojoPrimario,
-              barWidth: 3,
-              isStrokeCapRound: true,
-              dotData: const FlDotData(show: false),
-              belowBarData: BarAreaData(
-                show: true,
-                color: TemaApp.rojoPrimario.withOpacity(0.08),
-              ),
-            ),
-          ],
+    if (_cargando) {
+      return const SizedBox(
+        height: 200,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: TemaApp.rojoPrimario),
+              SizedBox(height: 12),
+              Text('Leyendo datos de Health Connect…',
+                  style:
+                      TextStyle(fontSize: 12, color: TemaApp.textoSecundario)),
+            ],
+          ),
         ),
-      ),
+      );
+    }
+
+    if (_error != null || _puntos.isEmpty) {
+      return SizedBox(
+        height: 200,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.sensors_off_outlined,
+                  color: TemaApp.textoSecundario, size: 36),
+              const SizedBox(height: 8),
+              Text(
+                _error ?? 'Sin datos disponibles.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    fontSize: 12, color: TemaApp.textoSecundario),
+              ),
+              const SizedBox(height: 12),
+              TextButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _cargando = true;
+                    _error = null;
+                  });
+                  _cargarDatosHealthConnect();
+                },
+                icon: const Icon(Icons.refresh, size: 16),
+                label: const Text('Reintentar'),
+                style: TextButton.styleFrom(
+                    foregroundColor: TemaApp.rojoPrimario),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final minY = _puntos.map((p) => p.y).reduce((a, b) => a < b ? a : b);
+    final maxY = _puntos.map((p) => p.y).reduce((a, b) => a > b ? a : b);
+    final paddingY = (maxY - minY).clamp(5.0, double.infinity) * 0.2;
+    final rangoMinX = _puntos.first.x;
+    final rangoMaxX = _puntos.last.x;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_inicioRango != null && _finRango != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Row(
+              children: [
+                const Icon(Icons.access_time,
+                    size: 12, color: TemaApp.textoSecundario),
+                const SizedBox(width: 4),
+                Text(
+                  'Últimas 6 h · ${_puntos.length} lecturas',
+                  style: const TextStyle(
+                      fontSize: 11, color: TemaApp.textoSecundario),
+                ),
+              ],
+            ),
+          ),
+        SizedBox(
+          height: 200,
+          child: LineChart(
+            LineChartData(
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: true,
+                getDrawingHorizontalLine: (_) => FlLine(
+                  color: TemaApp.grisBorde,
+                  strokeWidth: 0.5,
+                ),
+                getDrawingVerticalLine: (_) => FlLine(
+                  color: TemaApp.grisBorde,
+                  strokeWidth: 0.5,
+                ),
+              ),
+              titlesData: FlTitlesData(
+                show: true,
+                bottomTitles: AxisTitles(
+                  axisNameWidget: const Padding(
+                    padding: EdgeInsets.only(top: 4),
+                    child: Text(
+                      'Hora',
+                      style: TextStyle(
+                          fontSize: 10, color: TemaApp.textoSecundario),
+                    ),
+                  ),
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 28,
+                    interval: (rangoMaxX - rangoMinX) > 0
+                        ? (rangoMaxX - rangoMinX) / 5
+                        : 1,
+                    getTitlesWidget: (valor, meta) {
+                      return SideTitleWidget(
+                        axisSide: meta.axisSide,
+                        child: Text(
+                          _formatearEtiquetaX(valor),
+                          style: const TextStyle(
+                              fontSize: 9, color: TemaApp.textoSecundario),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                leftTitles: AxisTitles(
+                  axisNameWidget: const RotatedBox(
+                    quarterTurns: -1,
+                    child: Padding(
+                      padding: EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        'BPM',
+                        style: TextStyle(
+                            fontSize: 10, color: TemaApp.textoSecundario),
+                      ),
+                    ),
+                  ),
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 36,
+                    interval: ((maxY - minY) / 4).clamp(1.0, double.infinity),
+                    getTitlesWidget: (valor, meta) {
+                      return SideTitleWidget(
+                        axisSide: meta.axisSide,
+                        child: Text(
+                          valor.toStringAsFixed(0),
+                          style: const TextStyle(
+                              fontSize: 9, color: TemaApp.textoSecundario),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                rightTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                topTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+              ),
+              borderData: FlBorderData(
+                show: true,
+                border: Border.all(color: TemaApp.grisBorde, width: 0.5),
+              ),
+              minX: rangoMinX,
+              maxX: rangoMaxX,
+              minY: (minY - paddingY).clamp(0, double.infinity),
+              maxY: maxY + paddingY,
+              lineTouchData: LineTouchData(
+                enabled: widget.interactivo,
+                touchTooltipData: LineTouchTooltipData(
+                  getTooltipItems: (spots) => spots
+                      .map((s) => LineTooltipItem(
+                            '${s.y.toStringAsFixed(0)} bpm',
+                            const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12),
+                          ))
+                      .toList(),
+                ),
+              ),
+              lineBarsData: [
+                LineChartBarData(
+                  spots: _puntos,
+                  isCurved: true,
+                  color: TemaApp.rojoPrimario,
+                  barWidth: 2.5,
+                  isStrokeCapRound: true,
+                  dotData: FlDotData(
+                    show: _puntos.length <= 30,
+                    getDotPainter: (spot, percent, bar, index) =>
+                        FlDotCirclePainter(
+                      radius: 3,
+                      color: TemaApp.rojoPrimario,
+                      strokeWidth: 0,
+                      strokeColor: Colors.transparent,
+                    ),
+                  ),
+                  belowBarData: BarAreaData(
+                    show: true,
+                    color: TemaApp.rojoPrimario.withOpacity(0.08),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

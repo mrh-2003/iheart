@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:iheart/modelo/preprocesamiento.dart';
@@ -22,7 +23,8 @@ class InferenciaLocal {
         await Preprocesamiento.instancia.cargarParametrosEscalador();
         return true;
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Error al inicializar TFLite: $e');
       _inicializado = false;
     }
     return false;

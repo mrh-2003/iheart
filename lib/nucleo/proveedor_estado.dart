@@ -95,6 +95,7 @@ class ProveedorEstado extends ChangeNotifier {
     required String numeroDni,
     required String correo,
     required String contrasena,
+    required String confirmarContrasena,
   }) async {
     _cargando = true;
     notifyListeners();
@@ -105,6 +106,7 @@ class ProveedorEstado extends ChangeNotifier {
         numeroDni: numeroDni,
         correo: correo,
         contrasena: contrasena,
+        confirmarContrasena: confirmarContrasena,
       );
     } finally {
       _cargando = false;

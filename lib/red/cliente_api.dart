@@ -47,6 +47,57 @@ class ClienteApi {
     }
   }
 
+  String _traducirError(String campo, String mensajeOriginal) {
+    final campoTraducido = _traducirCampo(campo);
+    final mensajeTraducido = _traducirMensaje(mensajeOriginal);
+    if (campoTraducido.isNotEmpty) {
+      return '$campoTraducido: $mensajeTraducido';
+    }
+    return mensajeTraducido;
+  }
+
+  String _traducirCampo(String campo) {
+    switch (campo) {
+      case 'nombre_completo':
+        return 'Nombre completo';
+      case 'numero_dni':
+        return 'Número de DNI';
+      case 'correo':
+        return 'Correo electrónico';
+      case 'contrasena':
+        return 'Contraseña';
+      case 'confirmar_contrasena':
+        return 'Confirmar contraseña';
+      case 'id_cliente':
+        return 'ID de cliente';
+      case 'ronda':
+        return 'Ronda';
+      case 'numero_muestras':
+        return 'Número de muestras';
+      case 'pesos':
+        return 'Pesos';
+      default:
+        return campo;
+    }
+  }
+
+  String _traducirMensaje(String mensaje) {
+    final msgLower = mensaje.toLowerCase();
+    if (msgLower.contains('field required') || msgLower == 'missing') {
+      return 'es obligatorio';
+    }
+    if (msgLower.contains('value is not a valid email address') || msgLower.contains('value_error.email')) {
+      return 'no es un correo electrónico válido';
+    }
+    if (msgLower.contains('string_too_short')) {
+      return 'es demasiado corto';
+    }
+    if (msgLower.contains('at least')) {
+      return 'debe tener al menos más caracteres';
+    }
+    return mensaje;
+  }
+
   String? _obtenerMensajeError(String cuerpo) {
     try {
       final datos = jsonDecode(cuerpo);
@@ -55,8 +106,16 @@ class ClienteApi {
         if (detalle is List) {
           final mensajes = <String>[];
           for (final item in detalle) {
-            if (item is Map && item.containsKey('msg')) {
-              mensajes.add(item['msg'].toString());
+            if (item is Map) {
+              final msg = item['msg']?.toString() ?? 'Error';
+              final loc = item['loc'];
+              final campo = (loc is List && loc.isNotEmpty) ? loc.last.toString() : '';
+              final esNumero = int.tryParse(campo) != null;
+              if (campo.isNotEmpty && campo != 'body' && !esNumero) {
+                mensajes.add(_traducirError(campo, msg));
+              } else {
+                mensajes.add(_traducirMensaje(msg));
+              }
             } else {
               mensajes.add(item.toString());
             }
@@ -68,6 +127,7 @@ class ClienteApi {
     } catch (_) {}
     return null;
   }
+
 
   Future<http.Response> get(String ruta, {bool requiereAuth = true}) async {
     try {

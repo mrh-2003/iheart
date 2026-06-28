@@ -7,8 +7,10 @@ class ServicioModelo {
 
   Future<int> obtenerVersionModelo() async {
     final respuesta = await _cliente.get('/model/version');
-    final mapa = jsonDecode(respuesta.body) as Map<String, dynamic>;
-    return mapa['version'] as int? ?? 0;
+    final decodificado = jsonDecode(respuesta.body);
+    final mapa = decodificado is Map<String, dynamic> ? decodificado : <String, dynamic>{};
+    final versionVal = mapa['version'];
+    return versionVal is int ? versionVal : 0;
   }
 
   Future<Uint8List> descargarModeloTflite() async {

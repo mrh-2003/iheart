@@ -133,7 +133,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
                         Text(
                           ultimoDiag != null && ultimoDiag['bpm_promedio'] != null
                               ? '${(ultimoDiag['bpm_promedio'] as num).toStringAsFixed(0)} bpm'
-                              : '72 bpm',
+                              : '— bpm',
                           style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: TemaApp.textoOscuro),
                         ),
                       ],
@@ -166,7 +166,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
                         Text(
                           ultimoDiag != null && ultimoDiag['spo2_promedio'] != null
                               ? '${(ultimoDiag['spo2_promedio'] as num).toStringAsFixed(0)}%'
-                              : '98%',
+                              : '—%',
                           style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: TemaApp.textoOscuro),
                         ),
                       ],

@@ -39,9 +39,12 @@ class Preprocesamiento {
       final archivo = File('${directorio.path}/scaler.json');
       if (await archivo.exists()) {
         final contenido = await archivo.readAsString();
-        final datos = jsonDecode(contenido) as Map<String, dynamic>;
-        final mediasCargadas = List<double>.from(datos['mean'] as List);
-        final desvCargadas = List<double>.from(datos['std'] as List);
+        final decodificado = jsonDecode(contenido);
+        final datos = decodificado is Map<String, dynamic> ? decodificado : <String, dynamic>{};
+        final meanVal = datos['mean'];
+        final stdVal = datos['std'];
+        final mediasCargadas = List<double>.from(meanVal is List ? meanVal : []);
+        final desvCargadas = List<double>.from(stdVal is List ? stdVal : []);
         if (mediasCargadas.length == 32 && desvCargadas.length == 32) {
           _medias = mediasCargadas;
           _desviaciones = desvCargadas;

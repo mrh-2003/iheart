@@ -1,6 +1,5 @@
-import 'package:sqflite/sqflite.dart';
-import 'package:path_provider/path_provider.dart';
 import 'dart:io';
+import 'package:sqflite/sqflite.dart';
 
 class BaseDatosLocal {
   static final BaseDatosLocal instancia = BaseDatosLocal._interna();
@@ -15,8 +14,11 @@ class BaseDatosLocal {
   }
 
   Future<Database> _inicializarBD() async {
-    final directorio = await getApplicationDocumentsDirectory();
-    final ruta = '${directorio.path}/ihearth_local.db';
+    final rutaDirectorio = await getDatabasesPath();
+    try {
+      await Directory(rutaDirectorio).create(recursive: true);
+    } catch (_) {}
+    final ruta = '$rutaDirectorio/ihearth_local.db';
 
     return await openDatabase(
       ruta,
@@ -27,7 +29,7 @@ class BaseDatosLocal {
   }
 
   Future<void> _configurarBD(Database db) async {
-    await db.execute('PRAGMA journal_mode = WAL;');
+    await db.rawQuery('PRAGMA journal_mode = WAL;');
     await db.execute('PRAGMA foreign_keys = ON;');
   }
 
