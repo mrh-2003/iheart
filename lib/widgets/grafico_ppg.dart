@@ -315,7 +315,7 @@ class _GraficoPPGState extends State<GraficoPPG> {
                   ),
                   belowBarData: BarAreaData(
                     show: true,
-                    color: TemaApp.rojoPrimario.withOpacity(0.08),
+                    color: TemaApp.rojoPrimario.withAlpha(20),
                   ),
                 ),
               ],
