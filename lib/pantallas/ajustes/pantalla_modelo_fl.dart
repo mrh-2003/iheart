@@ -7,6 +7,7 @@ import 'package:iheart/nucleo/extensiones.dart';
 import 'package:iheart/nucleo/proveedor_estado.dart';
 import 'package:iheart/datos/repositorio_modelo.dart';
 import 'package:iheart/widgets/boton_primario.dart';
+import 'package:iheart/red/servicio_biometrico.dart';
 
 class PantallaModeloFL extends StatefulWidget {
   const PantallaModeloFL({super.key});
@@ -16,7 +17,6 @@ class PantallaModeloFL extends StatefulWidget {
 }
 
 class _PantallaModeloFLState extends State<PantallaModeloFL> {
-  final Health _health = Health();
   bool _disponibleHC = false;
   bool _autorizadoHC = false;
   String _dispositivoOrigen = 'Ninguno';
@@ -30,24 +30,23 @@ class _PantallaModeloFLState extends State<PantallaModeloFL> {
 
   Future<void> _verificarHealthConnect() async {
     try {
-      final bool disponible = await _health.isHealthConnectAvailable();
+      final bool disponible = await ServicioBiometrico.instancia.esHealthConnectDisponible();
       setState(() {
         _disponibleHC = disponible;
       });
 
       if (disponible) {
-        final bool? tienePermiso = await _health.hasPermissions([HealthDataType.HEART_RATE]);
+        final bool tienePermiso = await ServicioBiometrico.instancia.verificarPermisos(const [HealthDataType.HEART_RATE]);
         setState(() {
-          _autorizadoHC = tienePermiso ?? false;
+          _autorizadoHC = tienePermiso;
         });
 
         if (_autorizadoHC) {
           final ahora = DateTime.now();
           final hace24Horas = ahora.subtract(const Duration(hours: 24));
-          final datos = await _health.getHealthDataFromTypes(
-            types: [HealthDataType.HEART_RATE],
-            startTime: hace24Horas,
-            endTime: ahora,
+          final datos = await ServicioBiometrico.instancia.obtenerDatosFrecuenciaCardiaca(
+            hace24Horas,
+            ahora,
           );
           if (datos.isNotEmpty && mounted) {
             setState(() {

@@ -5,6 +5,7 @@ import 'package:iheart/nucleo/tema.dart';
 import 'package:iheart/nucleo/extensiones.dart';
 import 'package:iheart/widgets/boton_primario.dart';
 import 'package:iheart/widgets/boton_secundario.dart';
+import 'package:iheart/red/servicio_biometrico.dart';
 
 class PantallaIoT extends StatefulWidget {
   const PantallaIoT({super.key});
@@ -14,13 +15,14 @@ class PantallaIoT extends StatefulWidget {
 }
 
 class _PantallaIoTState extends State<PantallaIoT> {
-  final Health _health = Health();
   final List<HealthDataType> _tipos = const [HealthDataType.HEART_RATE];
 
   bool _disponible = false;
   bool _autorizado = false;
   bool _cargando = true;
   bool _cargandoAccion = false;
+  bool _simulado = false;
+  double _offset = 0.0;
   List<HealthDataPoint> _ultimasLecturas = [];
 
   @override
@@ -35,15 +37,19 @@ class _PantallaIoTState extends State<PantallaIoT> {
     });
 
     try {
-      final bool disponible = await _health.isHealthConnectAvailable();
+      final bool disponible = await ServicioBiometrico.instancia.esHealthConnectDisponible();
+      final bool simulado = await ServicioBiometrico.instancia.estaEnModoSimulado();
+      final double offset = await ServicioBiometrico.instancia.obtenerOffset();
       setState(() {
         _disponible = disponible;
+        _simulado = simulado;
+        _offset = offset;
       });
 
       if (disponible) {
-        final bool? tienePermisos = await _health.hasPermissions(_tipos);
+        final bool tienePermisos = await ServicioBiometrico.instancia.verificarPermisos(_tipos);
         setState(() {
-          _autorizado = tienePermisos ?? false;
+          _autorizado = tienePermisos;
         });
 
         if (_autorizado) {
@@ -69,7 +75,7 @@ class _PantallaIoTState extends State<PantallaIoT> {
     });
 
     try {
-      final bool permisoConcedido = await _health.requestAuthorization(_tipos);
+      final bool permisoConcedido = await ServicioBiometrico.instancia.solicitarAutorizacion(_tipos);
       setState(() {
         _autorizado = permisoConcedido;
       });
@@ -103,7 +109,7 @@ class _PantallaIoTState extends State<PantallaIoT> {
     });
 
     try {
-      await _health.revokePermissions();
+      await ServicioBiometrico.instancia.revocarPermisos();
       setState(() {
         _autorizado = false;
         _ultimasLecturas.clear();
@@ -128,10 +134,9 @@ class _PantallaIoTState extends State<PantallaIoT> {
     try {
       final ahora = DateTime.now();
       final hace24Horas = ahora.subtract(const Duration(hours: 24));
-      final datos = await _health.getHealthDataFromTypes(
-        types: _tipos,
-        startTime: hace24Horas,
-        endTime: ahora,
+      final datos = await ServicioBiometrico.instancia.obtenerDatosFrecuenciaCardiaca(
+        hace24Horas,
+        ahora,
       );
 
       setState(() {
@@ -156,7 +161,7 @@ class _PantallaIoTState extends State<PantallaIoT> {
 
   Widget _construirCabeceraEstado() {
     final String estadoTexto = _disponible
-        ? (_autorizado ? 'CONECTADO' : 'NO VINCULADO')
+        ? (_autorizado ? (_simulado ? 'SIMULADO' : 'CONECTADO') : 'NO VINCULADO')
         : 'NO DISPONIBLE';
     final Color estadoColor = _disponible
         ? (_autorizado ? TemaApp.verdeExito : TemaApp.amarilloAlerta)
@@ -182,20 +187,27 @@ class _PantallaIoTState extends State<PantallaIoT> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Row(
-                children: [
-                  Icon(Icons.health_and_safety_outlined, color: TemaApp.rojoPrimario, size: 28),
-                  SizedBox(width: 12),
-                  Text(
-                    'Google Health Connect',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: TemaApp.textoOscuro,
+              Expanded(
+                child: Row(
+                  children: [
+                    const Icon(Icons.health_and_safety_outlined, color: TemaApp.rojoPrimario, size: 28),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _simulado ? 'Simulador Health Connect' : 'Google Health Connect',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: TemaApp.textoOscuro,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
@@ -214,12 +226,94 @@ class _PantallaIoTState extends State<PantallaIoT> {
             ],
           ),
           const SizedBox(height: 16),
-          const Text(
-            'Sincronización directa y real de datos biométricos de salud sin simulaciones.',
-            style: TextStyle(
+          Text(
+            _simulado
+                ? 'Simulación de datos de salud para compatibilidad con dispositivos antiguos.'
+                : 'Sincronización directa y real de datos biométricos de salud sin simulaciones.',
+            style: const TextStyle(
               fontSize: 13,
               color: TemaApp.textoSecundario,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _construirAjusteOffset() {
+    if (!_simulado || !_autorizado) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(top: 24),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: TemaApp.blancoFondo,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: TemaApp.grisBorde),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Desviación del Ritmo Cardíaco (x)',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: TemaApp.textoOscuro,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Ajuste el valor para inflar o desinflar el ritmo cardíaco simulado.',
+            style: TextStyle(
+              fontSize: 12,
+              color: TemaApp.textoSecundario,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.remove_circle_outline, color: TemaApp.rojoPrimario, size: 32),
+                onPressed: () async {
+                  setState(() {
+                    _offset -= 5;
+                  });
+                  await ServicioBiometrico.instancia.guardarOffset(_offset);
+                  await _cargarLecturasRecientes();
+                },
+              ),
+              const SizedBox(width: 24),
+              Text(
+                '${_offset >= 0 ? "+" : ""}${_offset.toStringAsFixed(0)} bpm',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: TemaApp.textoOscuro,
+                ),
+              ),
+              const SizedBox(width: 24),
+              IconButton(
+                icon: const Icon(Icons.add_circle_outline, color: TemaApp.rojoPrimario, size: 32),
+                onPressed: () async {
+                  setState(() {
+                    _offset += 5;
+                  });
+                  await ServicioBiometrico.instancia.guardarOffset(_offset);
+                  await _cargarLecturasRecientes();
+                },
+              ),
+            ],
           ),
         ],
       ),
@@ -237,8 +331,7 @@ class _PantallaIoTState extends State<PantallaIoT> {
         child: Column(
           children: [
             const Text(
-              'Health Connect no está instalado o no es compatible con este dispositivo. '
-              'Instale la aplicación oficial desde Google Play Store para continuar.',
+              'Health Connect no está instalado o no es compatible con este dispositivo.',
               style: TextStyle(color: TemaApp.textoSecundario, fontSize: 13),
               textAlign: TextAlign.center,
             ),
@@ -364,7 +457,7 @@ class _PantallaIoTState extends State<PantallaIoT> {
                 SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'No se encontraron lecturas de frecuencia cardíaca en Health Connect.',
+                    'No se encontraron lecturas de frecuencia cardíaca.',
                     style: TextStyle(color: TemaApp.textoSecundario, fontSize: 13),
                   ),
                 ),
@@ -437,6 +530,7 @@ class _PantallaIoTState extends State<PantallaIoT> {
                 padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
                 children: [
                   _construirCabeceraEstado(),
+                  _construirAjusteOffset(),
                   const SizedBox(height: 24),
                   _construirDetallesConexion(),
                   const SizedBox(height: 24),

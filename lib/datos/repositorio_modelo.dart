@@ -1,5 +1,4 @@
 import 'package:iheart/datos/base_datos_local.dart';
-import 'package:sqflite/sqflite.dart';
 
 class EstadoModeloFl {
   final int id;

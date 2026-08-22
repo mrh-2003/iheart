@@ -18,7 +18,7 @@ class InferenciaLocal {
       final directorio = await getApplicationDocumentsDirectory();
       final rutaModelo = '${directorio.path}/modelo.tflite';
       if (await File(rutaModelo).exists()) {
-        _interprete = await Interpreter.fromFile(File(rutaModelo));
+        _interprete = Interpreter.fromFile(File(rutaModelo));
         _inicializado = true;
         await Preprocesamiento.instancia.cargarParametrosEscalador();
         return true;
@@ -42,10 +42,7 @@ class InferenciaLocal {
     }
 
     final featuresEscalados = Preprocesamiento.instancia.escalar(features);
-
-    // Formato de entrada: [1, 32]
     final entrada = [featuresEscalados];
-    // Formato de salida: [1, 1] (probabilidad de CAD)
     final salida = List.generate(1, (_) => List.filled(1, 0.0));
 
     _interprete!.run(entrada, salida);

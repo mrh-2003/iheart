@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:health/health.dart';
 import 'package:iheart/nucleo/tema.dart';
+import 'package:iheart/red/servicio_biometrico.dart';
 
 class GraficoPPG extends StatefulWidget {
   final bool interactivo;
@@ -21,18 +23,29 @@ class _GraficoPPGState extends State<GraficoPPG> {
   String? _error;
   DateTime? _inicioRango;
   DateTime? _finRango;
+  Timer? _timer;
 
   @override
   void initState() {
     super.initState();
     _cargarDatosHealthConnect();
+    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (mounted) {
+        _cargarDatosHealthConnect();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 
   Future<void> _cargarDatosHealthConnect() async {
     try {
-      final health = Health();
-      final tipos = [HealthDataType.HEART_RATE];
-      final permisoConcedido = await health.requestAuthorization(tipos);
+      final tipos = const [HealthDataType.HEART_RATE];
+      final permisoConcedido = await ServicioBiometrico.instancia.solicitarAutorizacion(tipos);
 
       if (!permisoConcedido) {
         if (mounted) {
@@ -46,10 +59,9 @@ class _GraficoPPGState extends State<GraficoPPG> {
 
       final ahora = DateTime.now();
       final hace6Horas = ahora.subtract(const Duration(hours: 6));
-      final datos = await health.getHealthDataFromTypes(
-        types: tipos,
-        startTime: hace6Horas,
-        endTime: ahora,
+      final datos = await ServicioBiometrico.instancia.obtenerDatosFrecuenciaCardiaca(
+        hace6Horas,
+        ahora,
       );
 
       if (!mounted) return;
@@ -62,18 +74,17 @@ class _GraficoPPGState extends State<GraficoPPG> {
         return;
       }
 
-      datos.sort((a, b) => a.dateFrom.compareTo(b.dateFrom));
+      final List<HealthDataPoint> listadoClonado = List.from(datos);
+      listadoClonado.sort((a, b) => a.dateFrom.compareTo(b.dateFrom));
 
-      final baseMs = datos.first.dateFrom.millisecondsSinceEpoch.toDouble();
+      final baseMs = listadoClonado.first.dateFrom.millisecondsSinceEpoch.toDouble();
       final nuevos = <FlSpot>[];
 
-      for (final punto in datos) {
+      for (final punto in listadoClonado) {
         if (punto.value is NumericHealthValue) {
-          final bpm =
-              (punto.value as NumericHealthValue).numericValue.toDouble();
+          final bpm = (punto.value as NumericHealthValue).numericValue.toDouble();
           if (bpm > 0 && bpm < 300) {
-            final xMin =
-                (punto.dateFrom.millisecondsSinceEpoch - baseMs) / 60000.0;
+            final xMin = (punto.dateFrom.millisecondsSinceEpoch - baseMs) / 60000.0;
             nuevos.add(FlSpot(xMin, bpm));
           }
         }
@@ -89,8 +100,8 @@ class _GraficoPPGState extends State<GraficoPPG> {
 
       setState(() {
         _puntos = nuevos;
-        _inicioRango = datos.first.dateFrom;
-        _finRango = datos.last.dateFrom;
+        _inicioRango = listadoClonado.first.dateFrom;
+        _finRango = listadoClonado.last.dateFrom;
         _cargando = false;
         _error = null;
       });
@@ -106,8 +117,7 @@ class _GraficoPPGState extends State<GraficoPPG> {
 
   String _formatearEtiquetaX(double minutosDesdeInicio) {
     if (_inicioRango == null) return '';
-    final momento =
-        _inicioRango!.add(Duration(minutes: minutosDesdeInicio.toInt()));
+    final momento = _inicioRango!.add(Duration(minutes: minutosDesdeInicio.toInt()));
     final h = momento.hour.toString().padLeft(2, '0');
     final m = momento.minute.toString().padLeft(2, '0');
     return '$h:$m';
@@ -124,9 +134,10 @@ class _GraficoPPGState extends State<GraficoPPG> {
             children: [
               CircularProgressIndicator(color: TemaApp.rojoPrimario),
               SizedBox(height: 12),
-              Text('Leyendo datos de Health Connect…',
-                  style:
-                      TextStyle(fontSize: 12, color: TemaApp.textoSecundario)),
+              Text(
+                'Leyendo datos de Health Connect...',
+                style: TextStyle(fontSize: 12, color: TemaApp.textoSecundario),
+              ),
             ],
           ),
         ),
@@ -140,14 +151,16 @@ class _GraficoPPGState extends State<GraficoPPG> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.sensors_off_outlined,
-                  color: TemaApp.textoSecundario, size: 36),
+              const Icon(
+                Icons.sensors_off_outlined,
+                color: TemaApp.textoSecundario,
+                size: 36,
+              ),
               const SizedBox(height: 8),
               Text(
                 _error ?? 'Sin datos disponibles.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                    fontSize: 12, color: TemaApp.textoSecundario),
+                style: const TextStyle(fontSize: 12, color: TemaApp.textoSecundario),
               ),
               const SizedBox(height: 12),
               TextButton.icon(
@@ -160,8 +173,7 @@ class _GraficoPPGState extends State<GraficoPPG> {
                 },
                 icon: const Icon(Icons.refresh, size: 16),
                 label: const Text('Reintentar'),
-                style: TextButton.styleFrom(
-                    foregroundColor: TemaApp.rojoPrimario),
+                style: TextButton.styleFrom(foregroundColor: TemaApp.rojoPrimario),
               ),
             ],
           ),
@@ -183,13 +195,11 @@ class _GraficoPPGState extends State<GraficoPPG> {
             padding: const EdgeInsets.only(bottom: 4),
             child: Row(
               children: [
-                const Icon(Icons.access_time,
-                    size: 12, color: TemaApp.textoSecundario),
+                const Icon(Icons.access_time, size: 12, color: TemaApp.textoSecundario),
                 const SizedBox(width: 4),
                 Text(
                   'Últimas 6 h · ${_puntos.length} lecturas',
-                  style: const TextStyle(
-                      fontSize: 11, color: TemaApp.textoSecundario),
+                  style: const TextStyle(fontSize: 11, color: TemaApp.textoSecundario),
                 ),
               ],
             ),
@@ -201,11 +211,11 @@ class _GraficoPPGState extends State<GraficoPPG> {
               gridData: FlGridData(
                 show: true,
                 drawVerticalLine: true,
-                getDrawingHorizontalLine: (_) => FlLine(
+                getDrawingHorizontalLine: (_) => const FlLine(
                   color: TemaApp.grisBorde,
                   strokeWidth: 0.5,
                 ),
-                getDrawingVerticalLine: (_) => FlLine(
+                getDrawingVerticalLine: (_) => const FlLine(
                   color: TemaApp.grisBorde,
                   strokeWidth: 0.5,
                 ),
@@ -217,23 +227,19 @@ class _GraficoPPGState extends State<GraficoPPG> {
                     padding: EdgeInsets.only(top: 4),
                     child: Text(
                       'Hora',
-                      style: TextStyle(
-                          fontSize: 10, color: TemaApp.textoSecundario),
+                      style: TextStyle(fontSize: 10, color: TemaApp.textoSecundario),
                     ),
                   ),
                   sideTitles: SideTitles(
                     showTitles: true,
                     reservedSize: 28,
-                    interval: (rangoMaxX - rangoMinX) > 0
-                        ? (rangoMaxX - rangoMinX) / 5
-                        : 1,
+                    interval: (rangoMaxX - rangoMinX) > 0 ? (rangoMaxX - rangoMinX) / 5 : 1,
                     getTitlesWidget: (valor, meta) {
                       return SideTitleWidget(
                         axisSide: meta.axisSide,
                         child: Text(
                           _formatearEtiquetaX(valor),
-                          style: const TextStyle(
-                              fontSize: 9, color: TemaApp.textoSecundario),
+                          style: const TextStyle(fontSize: 9, color: TemaApp.textoSecundario),
                         ),
                       );
                     },
@@ -246,8 +252,7 @@ class _GraficoPPGState extends State<GraficoPPG> {
                       padding: EdgeInsets.only(bottom: 4),
                       child: Text(
                         'BPM',
-                        style: TextStyle(
-                            fontSize: 10, color: TemaApp.textoSecundario),
+                        style: TextStyle(fontSize: 10, color: TemaApp.textoSecundario),
                       ),
                     ),
                   ),
@@ -260,8 +265,7 @@ class _GraficoPPGState extends State<GraficoPPG> {
                         axisSide: meta.axisSide,
                         child: Text(
                           valor.toStringAsFixed(0),
-                          style: const TextStyle(
-                              fontSize: 9, color: TemaApp.textoSecundario),
+                          style: const TextStyle(fontSize: 9, color: TemaApp.textoSecundario),
                         ),
                       );
                     },
@@ -289,9 +293,10 @@ class _GraficoPPGState extends State<GraficoPPG> {
                       .map((s) => LineTooltipItem(
                             '${s.y.toStringAsFixed(0)} bpm',
                             const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12),
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
                           ))
                       .toList(),
                 ),
@@ -305,8 +310,7 @@ class _GraficoPPGState extends State<GraficoPPG> {
                   isStrokeCapRound: true,
                   dotData: FlDotData(
                     show: _puntos.length <= 30,
-                    getDotPainter: (spot, percent, bar, index) =>
-                        FlDotCirclePainter(
+                    getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(
                       radius: 3,
                       color: TemaApp.rojoPrimario,
                       strokeWidth: 0,
@@ -315,7 +319,7 @@ class _GraficoPPGState extends State<GraficoPPG> {
                   ),
                   belowBarData: BarAreaData(
                     show: true,
-                    color: TemaApp.rojoPrimario.withAlpha(20),
+                    color: TemaApp.rojoPrimario.withValues(alpha: 0.08),
                   ),
                 ),
               ],

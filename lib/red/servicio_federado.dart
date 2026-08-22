@@ -14,7 +14,7 @@ class ServicioFederado {
     await _cliente.post(
       '/federated/upload',
       cuerpo: {
-        'id_cliente': idCliente,
+        'id_cliente': idCliente.toString(),
         'ronda': ronda,
         'numero_muestras': numeroMuestras,
         'pesos': pesos,

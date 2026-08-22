@@ -33,7 +33,7 @@ class BaseDatosLocal {
     await db.execute('PRAGMA foreign_keys = ON;');
   }
 
-  Future<void> _crearBD(Database db, int version) async {
+  Future<void> _crearTablasPrincipales(Database db) async {
     await db.execute('''
       CREATE TABLE perfil_paciente (
         id                    INTEGER PRIMARY KEY,
@@ -41,7 +41,7 @@ class BaseDatosLocal {
         numero_dni            TEXT    NOT NULL UNIQUE,
         correo                TEXT    NOT NULL UNIQUE,
         edad                  INTEGER,
-        sexo                  TEXT    CHECK(sexo IN ('Masculino', 'Femenino')),
+        sexo                  TEXT,
         peso_kg               REAL,
         altura_m              REAL,
         imc                   REAL,
@@ -58,17 +58,15 @@ class BaseDatosLocal {
     await db.execute('''
       CREATE TABLE sesiones_monitoreo (
         id                    INTEGER PRIMARY KEY AUTOINCREMENT,
-        tipo                  TEXT    NOT NULL CHECK(tipo IN (
-                                'reposo', 'actividad', 'nocturno', 'post_actividad', 'manual'
-                              )),
+        tipo                  TEXT    NOT NULL,
         bpm_promedio          REAL,
         bpm_minimo            REAL,
         bpm_maximo            REAL,
         spo2_promedio         REAL,
         hrv_ms                REAL,
-        ritmo_tipo            TEXT    CHECK(ritmo_tipo IN ('regular', 'irregular', 'variable')),
-        calidad_senal         TEXT    CHECK(calidad_senal IN ('alta', 'media', 'baja')),
-        fuente                TEXT    CHECK(fuente IN ('smartwatch', 'camara', 'manual')),
+        ritmo_tipo            TEXT,
+        calidad_senal         TEXT,
+        fuente                TEXT,
         dispositivo_nombre    TEXT,
         duracion_segundos     INTEGER,
         datos_ppg_json        TEXT,
@@ -95,23 +93,25 @@ class BaseDatosLocal {
         antecedente_familiar_cad    INTEGER NOT NULL DEFAULT 0,
         presenta_edema              INTEGER NOT NULL DEFAULT 0,
         presenta_dolor_pecho        INTEGER NOT NULL DEFAULT 0,
-        frecuencia_dolor_pecho      INTEGER DEFAULT 0 CHECK(frecuencia_dolor_pecho BETWEEN 0 AND 5),
-        clasificacion_dolor         INTEGER DEFAULT 0 CHECK(clasificacion_dolor BETWEEN 0 AND 5),
-        tipo_dolor                  TEXT    CHECK(tipo_dolor IN ('tipico', 'atipico', 'no_anginoso', NULL)),
+        frecuencia_dolor_pecho      INTEGER DEFAULT 0,
+        clasificacion_dolor         INTEGER DEFAULT 0,
+        tipo_dolor                  TEXT,
         esfuerzo_fisico_reciente    INTEGER NOT NULL DEFAULT 0,
         disnea                      INTEGER NOT NULL DEFAULT 0,
         creado_en                   TEXT    NOT NULL DEFAULT (datetime('now'))
       )
     ''');
+  }
 
+  Future<void> _crearTablasAuxiliares(Database db) async {
     await db.execute('''
       CREATE TABLE diagnosticos (
         id                    INTEGER PRIMARY KEY AUTOINCREMENT,
         id_sesion_monitoreo   INTEGER REFERENCES sesiones_monitoreo(id),
         id_cuestionario       INTEGER REFERENCES cuestionarios(id),
         probabilidad_cad      REAL    NOT NULL,
-        nivel_riesgo          TEXT    NOT NULL CHECK(nivel_riesgo IN ('bajo', 'moderado', 'alto', 'critico')),
-        etiqueta_prediccion   TEXT    NOT NULL CHECK(etiqueta_prediccion IN ('Normal', 'CAD')),
+        nivel_riesgo          TEXT    NOT NULL,
+        etiqueta_prediccion   TEXT    NOT NULL,
         version_modelo_usada  INTEGER NOT NULL DEFAULT 0,
         umbral_aplicado       REAL    NOT NULL DEFAULT 0.5,
         inferencia_local      INTEGER NOT NULL DEFAULT 1,
@@ -138,7 +138,7 @@ class BaseDatosLocal {
         marca                 TEXT,
         modelo                TEXT,
         mac_address           TEXT    UNIQUE,
-        tipo                  TEXT    CHECK(tipo IN ('smartwatch', 'smartband', 'oximetro', 'otro')),
+        tipo                  TEXT,
         firmware              TEXT,
         bateria_porcentaje    INTEGER,
         ultima_sincronizacion TEXT,
@@ -147,7 +147,9 @@ class BaseDatosLocal {
         creado_en             TEXT    NOT NULL DEFAULT (datetime('now'))
       )
     ''');
+  }
 
+  Future<void> _crearTablasModeloYAlertas(Database db) async {
     await db.execute('''
       CREATE TABLE estado_modelo_fl (
         id                    INTEGER PRIMARY KEY,
@@ -166,10 +168,7 @@ class BaseDatosLocal {
     await db.execute('''
       CREATE TABLE alertas (
         id                    INTEGER PRIMARY KEY AUTOINCREMENT,
-        tipo                  TEXT    NOT NULL CHECK(tipo IN (
-                                'bpm_alto', 'bpm_bajo', 'spo2_bajo', 'hrv_anormal',
-                                'riesgo_alto', 'riesgo_critico', 'calibracion_requerida'
-                              )),
+        tipo                  TEXT    NOT NULL,
         mensaje               TEXT    NOT NULL,
         valor_detectado       REAL,
         leida                 INTEGER NOT NULL DEFAULT 0,
@@ -180,7 +179,7 @@ class BaseDatosLocal {
     await db.execute('''
       CREATE TABLE historial_sincronizacion (
         id                    INTEGER PRIMARY KEY AUTOINCREMENT,
-        tipo                  TEXT    NOT NULL CHECK(tipo IN ('descarga_modelo', 'subida_pesos', 'version_check')),
+        tipo                  TEXT    NOT NULL,
         exitoso               INTEGER NOT NULL DEFAULT 0,
         version_antes         INTEGER,
         version_despues       INTEGER,
@@ -188,6 +187,12 @@ class BaseDatosLocal {
         creado_en             TEXT    NOT NULL DEFAULT (datetime('now'))
       )
     ''');
+  }
+
+  Future<void> _crearBD(Database db, int version) async {
+    await _crearTablasPrincipales(db);
+    await _crearTablasAuxiliares(db);
+    await _crearTablasModeloYAlertas(db);
 
     await db.execute('CREATE INDEX idx_sesiones_tipo ON sesiones_monitoreo(tipo);');
     await db.execute('CREATE INDEX idx_sesiones_fecha ON sesiones_monitoreo(iniciado_en);');
