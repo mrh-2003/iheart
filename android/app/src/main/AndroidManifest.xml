@@ -50,7 +50,7 @@
             </intent-filter>
         </activity>
 
-        <!-- Rationale activity for Health Connect -->
+        <!-- Rationale activity for Health Connect (Android 13 y anteriores) -->
         <activity-alias
             android:name=".RationaleActivity"
             android:exported="true"
@@ -58,6 +58,18 @@
             android:permission="android.permission.health.READ_HEART_RATE">
             <intent-filter>
                 <action android:name="androidx.health.platform.client.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- ViewPermissionUsageActivity for Health Connect (Android 14+) -->
+        <activity-alias
+            android:name="ViewPermissionUsageActivity"
+            android:exported="true"
+            android:targetActivity=".MainActivity"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
             </intent-filter>
         </activity-alias>
 
