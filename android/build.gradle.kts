@@ -20,12 +20,21 @@ subprojects {
 }
 
 subprojects {
-    plugins.withId("com.android.library") {
-        (extensions.findByName("android") as? com.android.build.gradle.BaseExtension)?.apply {
-            compileOptions {
-                sourceCompatibility = JavaVersion.VERSION_17
-                targetCompatibility = JavaVersion.VERSION_17
+    if (project.name != "app") {
+        afterEvaluate {
+            (project.extensions.findByName("android") as? com.android.build.gradle.BaseExtension)?.apply {
+                compileSdkVersion(36)
+                compileOptions {
+                    sourceCompatibility = JavaVersion.VERSION_17
+                    targetCompatibility = JavaVersion.VERSION_17
+                }
             }
+        }
+    }
+    plugins.withId("com.android.library") {
+        val androidComponents = extensions.findByType(com.android.build.api.variant.LibraryAndroidComponentsExtension::class.java)
+        androidComponents?.finalizeDsl { ext ->
+            ext.compileSdk = 36
         }
     }
     tasks.withType<org.gradle.api.tasks.compile.JavaCompile>().configureEach {
