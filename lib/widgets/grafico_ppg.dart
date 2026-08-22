@@ -29,7 +29,7 @@ class _GraficoPPGState extends State<GraficoPPG> {
   void initState() {
     super.initState();
     _cargarDatosHealthConnect();
-    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+    _timer = Timer.periodic(const Duration(seconds: 15), (t) {
       if (mounted) {
         _cargarDatosHealthConnect();
       }
@@ -81,8 +81,9 @@ class _GraficoPPGState extends State<GraficoPPG> {
       final nuevos = <FlSpot>[];
 
       for (final punto in listadoClonado) {
-        if (punto.value is NumericHealthValue) {
-          final bpm = (punto.value as NumericHealthValue).numericValue.toDouble();
+        final valor = punto.value;
+        if (valor is NumericHealthValue) {
+          final bpm = valor.numericValue.toDouble();
           if (bpm > 0 && bpm < 300) {
             final xMin = (punto.dateFrom.millisecondsSinceEpoch - baseMs) / 60000.0;
             nuevos.add(FlSpot(xMin, bpm));
@@ -123,6 +124,174 @@ class _GraficoPPGState extends State<GraficoPPG> {
     return '$h:$m';
   }
 
+  Widget _construirEstadoVacioOError() {
+    return SizedBox(
+      height: 200,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.sensors_off_outlined,
+              color: TemaApp.textoSecundario,
+              size: 36,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _error ?? 'Sin datos disponibles.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 12, color: TemaApp.textoSecundario),
+            ),
+            const SizedBox(height: 12),
+            TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _cargando = true;
+                  _error = null;
+                });
+                _cargarDatosHealthConnect();
+              },
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text('Reintentar'),
+              style: TextButton.styleFrom(foregroundColor: TemaApp.rojoPrimario),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _construirGrafico(
+    double rangoMinX,
+    double rangoMaxX,
+    double minY,
+    double maxY,
+    double paddingY,
+  ) {
+    return SizedBox(
+      height: 200,
+      child: LineChart(
+        LineChartData(
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: true,
+            getDrawingHorizontalLine: (_) => const FlLine(
+              color: TemaApp.grisBorde,
+              strokeWidth: 0.5,
+            ),
+            getDrawingVerticalLine: (_) => const FlLine(
+              color: TemaApp.grisBorde,
+              strokeWidth: 0.5,
+            ),
+          ),
+          titlesData: FlTitlesData(
+            show: true,
+            bottomTitles: AxisTitles(
+              axisNameWidget: const Padding(
+                padding: EdgeInsets.only(top: 4),
+                child: Text(
+                  'Hora',
+                  style: TextStyle(fontSize: 10, color: TemaApp.textoSecundario),
+                ),
+              ),
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 28,
+                interval: (rangoMaxX - rangoMinX) > 0 ? (rangoMaxX - rangoMinX) / 5 : 1,
+                getTitlesWidget: (valor, meta) {
+                  return SideTitleWidget(
+                    axisSide: meta.axisSide,
+                    child: Text(
+                      _formatearEtiquetaX(valor),
+                      style: const TextStyle(fontSize: 9, color: TemaApp.textoSecundario),
+                    ),
+                  );
+                },
+              ),
+            ),
+            leftTitles: AxisTitles(
+              axisNameWidget: const RotatedBox(
+                quarterTurns: -1,
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    'BPM',
+                    style: TextStyle(fontSize: 10, color: TemaApp.textoSecundario),
+                  ),
+                ),
+              ),
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 36,
+                interval: ((maxY - minY) / 4).clamp(1.0, double.infinity),
+                getTitlesWidget: (valor, meta) {
+                  return SideTitleWidget(
+                    axisSide: meta.axisSide,
+                    child: Text(
+                      valor.toStringAsFixed(0),
+                      style: const TextStyle(fontSize: 9, color: TemaApp.textoSecundario),
+                    ),
+                  );
+                },
+              ),
+            ),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+          ),
+          borderData: FlBorderData(
+            show: true,
+            border: Border.all(color: TemaApp.grisBorde, width: 0.5),
+          ),
+          minX: rangoMinX,
+          maxX: rangoMaxX,
+          minY: (minY - paddingY).clamp(0, double.infinity),
+          maxY: maxY + paddingY,
+          lineTouchData: LineTouchData(
+            enabled: widget.interactivo,
+            touchTooltipData: LineTouchTooltipData(
+              getTooltipItems: (spots) => spots
+                  .map((s) => LineTooltipItem(
+                        '${s.y.toStringAsFixed(0)} bpm',
+                        const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ))
+                  .toList(),
+            ),
+          ),
+          lineBarsData: [
+            LineChartBarData(
+              spots: _puntos,
+              isCurved: true,
+              color: TemaApp.rojoPrimario,
+              barWidth: 2.5,
+              isStrokeCapRound: true,
+              dotData: FlDotData(
+                show: _puntos.length <= 30,
+                getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(
+                  radius: 3,
+                  color: TemaApp.rojoPrimario,
+                  strokeWidth: 0,
+                  strokeColor: Colors.transparent,
+                ),
+              ),
+              belowBarData: BarAreaData(
+                show: true,
+                color: TemaApp.rojoPrimario.withValues(alpha: 0.08),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_cargando) {
@@ -145,40 +314,7 @@ class _GraficoPPGState extends State<GraficoPPG> {
     }
 
     if (_error != null || _puntos.isEmpty) {
-      return SizedBox(
-        height: 200,
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.sensors_off_outlined,
-                color: TemaApp.textoSecundario,
-                size: 36,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _error ?? 'Sin datos disponibles.',
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12, color: TemaApp.textoSecundario),
-              ),
-              const SizedBox(height: 12),
-              TextButton.icon(
-                onPressed: () {
-                  setState(() {
-                    _cargando = true;
-                    _error = null;
-                  });
-                  _cargarDatosHealthConnect();
-                },
-                icon: const Icon(Icons.refresh, size: 16),
-                label: const Text('Reintentar'),
-                style: TextButton.styleFrom(foregroundColor: TemaApp.rojoPrimario),
-              ),
-            ],
-          ),
-        ),
-      );
+      return _construirEstadoVacioOError();
     }
 
     final minY = _puntos.map((p) => p.y).reduce((a, b) => a < b ? a : b);
@@ -204,128 +340,7 @@ class _GraficoPPGState extends State<GraficoPPG> {
               ],
             ),
           ),
-        SizedBox(
-          height: 200,
-          child: LineChart(
-            LineChartData(
-              gridData: FlGridData(
-                show: true,
-                drawVerticalLine: true,
-                getDrawingHorizontalLine: (_) => const FlLine(
-                  color: TemaApp.grisBorde,
-                  strokeWidth: 0.5,
-                ),
-                getDrawingVerticalLine: (_) => const FlLine(
-                  color: TemaApp.grisBorde,
-                  strokeWidth: 0.5,
-                ),
-              ),
-              titlesData: FlTitlesData(
-                show: true,
-                bottomTitles: AxisTitles(
-                  axisNameWidget: const Padding(
-                    padding: EdgeInsets.only(top: 4),
-                    child: Text(
-                      'Hora',
-                      style: TextStyle(fontSize: 10, color: TemaApp.textoSecundario),
-                    ),
-                  ),
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: 28,
-                    interval: (rangoMaxX - rangoMinX) > 0 ? (rangoMaxX - rangoMinX) / 5 : 1,
-                    getTitlesWidget: (valor, meta) {
-                      return SideTitleWidget(
-                        axisSide: meta.axisSide,
-                        child: Text(
-                          _formatearEtiquetaX(valor),
-                          style: const TextStyle(fontSize: 9, color: TemaApp.textoSecundario),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                leftTitles: AxisTitles(
-                  axisNameWidget: const RotatedBox(
-                    quarterTurns: -1,
-                    child: Padding(
-                      padding: EdgeInsets.only(bottom: 4),
-                      child: Text(
-                        'BPM',
-                        style: TextStyle(fontSize: 10, color: TemaApp.textoSecundario),
-                      ),
-                    ),
-                  ),
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: 36,
-                    interval: ((maxY - minY) / 4).clamp(1.0, double.infinity),
-                    getTitlesWidget: (valor, meta) {
-                      return SideTitleWidget(
-                        axisSide: meta.axisSide,
-                        child: Text(
-                          valor.toStringAsFixed(0),
-                          style: const TextStyle(fontSize: 9, color: TemaApp.textoSecundario),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                rightTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
-                topTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
-              ),
-              borderData: FlBorderData(
-                show: true,
-                border: Border.all(color: TemaApp.grisBorde, width: 0.5),
-              ),
-              minX: rangoMinX,
-              maxX: rangoMaxX,
-              minY: (minY - paddingY).clamp(0, double.infinity),
-              maxY: maxY + paddingY,
-              lineTouchData: LineTouchData(
-                enabled: widget.interactivo,
-                touchTooltipData: LineTouchTooltipData(
-                  getTooltipItems: (spots) => spots
-                      .map((s) => LineTooltipItem(
-                            '${s.y.toStringAsFixed(0)} bpm',
-                            const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ))
-                      .toList(),
-                ),
-              ),
-              lineBarsData: [
-                LineChartBarData(
-                  spots: _puntos,
-                  isCurved: true,
-                  color: TemaApp.rojoPrimario,
-                  barWidth: 2.5,
-                  isStrokeCapRound: true,
-                  dotData: FlDotData(
-                    show: _puntos.length <= 30,
-                    getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(
-                      radius: 3,
-                      color: TemaApp.rojoPrimario,
-                      strokeWidth: 0,
-                      strokeColor: Colors.transparent,
-                    ),
-                  ),
-                  belowBarData: BarAreaData(
-                    show: true,
-                    color: TemaApp.rojoPrimario.withValues(alpha: 0.08),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+        _construirGrafico(rangoMinX, rangoMaxX, minY, maxY, paddingY),
       ],
     );
   }

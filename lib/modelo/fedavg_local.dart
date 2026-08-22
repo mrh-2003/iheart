@@ -11,7 +11,6 @@ class FedAvgLocal {
 
   Future<bool> verificarRequisitosEntrenamiento() async {
     final diagnosticos = await _repoDiagnosticos.obtenerDiagnosticosRecientes(limite: 10);
-    // Necesitamos al menos 5 diagnósticos para el entrenamiento local
     return diagnosticos.length >= 5;
   }
 
@@ -21,23 +20,19 @@ class FedAvgLocal {
       throw Exception('Datos insuficientes para el entrenamiento local (mínimo 5).');
     }
 
-    // Simulamos el cálculo de gradientes/pesos locales del modelo (32 features + bias = 33 pesos)
     final random = Random();
     final List<double> pesosBase = List.generate(33, (_) => (random.nextDouble() * 2 - 1) * 0.1);
 
-    // Hacemos que el gradiente dependa de los diagnósticos reales del paciente para simular aprendizaje
     double promedioRiesgo = 0.0;
-    for (var diag in diagnosticos) {
+    for (final diag in diagnosticos) {
       promedioRiesgo += diag.probabilidadCad;
     }
     promedioRiesgo /= diagnosticos.length;
 
-    // Ajustar los pesos simulados según el promedio de riesgo del paciente
     for (int i = 0; i < pesosBase.length; i++) {
       pesosBase[i] += promedioRiesgo * 0.05;
     }
 
-    // Actualizar el estado del modelo local
     final estado = await _repoModelo.obtenerEstadoFL();
     final nuevoEstado = EstadoModeloFl(
       id: estado.id,
@@ -48,7 +43,7 @@ class FedAvgLocal {
       ultimaSincronizacion: estado.ultimaSincronizacion,
       pesosPendientes: true,
       entrenamientoLocalCompletado: true,
-      accuracyLocal: 0.85 + (random.nextDouble() * 0.1), // Simular accuracy
+      accuracyLocal: 0.85 + (random.nextDouble() * 0.1),
       actualizadoEn: DateTime.now().toIso8601String(),
     );
 
