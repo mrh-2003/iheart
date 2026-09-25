@@ -1,4 +1,4 @@
-# AGENTS.md — I HEAR(TH) Flutter App
+# AGENTS.md — I HEART Flutter App
 
 ## Contexto del proyecto
 

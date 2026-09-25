@@ -58,7 +58,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
   String _obtenerTituloTab(int indice) {
     switch (indice) {
       case 0:
-        return 'I HEAR(TH)';
+        return 'I HEART';
       case 1:
         return 'Evaluar Salud';
       case 2:
@@ -68,7 +68,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
       case 4:
         return 'Ajustes';
       default:
-        return 'I HEAR(TH)';
+        return 'I HEART';
     }
   }
 

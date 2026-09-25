@@ -1,5 +1,5 @@
 -- ============================================================
--- I HEAR(TH) — Base de datos local SQLite
+-- I HEART — Base de datos local SQLite
 -- Ejecutar en el dispositivo móvil vía sqflite (Flutter)
 -- Versión: 1.0.0
 -- ============================================================
