@@ -1,17 +1,30 @@
+import 'dart:io';
 import 'package:health/health.dart';
 
 class ServicioBiometrico {
   static final ServicioBiometrico instancia = ServicioBiometrico._interno();
   final Health _health = Health();
+  Future<void>? _configuracion;
+  bool _solicitandoPermisos = false;
 
   ServicioBiometrico._interno();
 
+  Future<void> _asegurarConfiguracion() async {
+    try {
+      await (_configuracion ??= _health.configure());
+    } catch (error) {
+      _configuracion = null;
+      throw StateError('No se pudo inicializar Health Connect: $error');
+    }
+  }
+
   Future<bool> esHealthConnectDisponible() async {
     try {
+      await _asegurarConfiguracion();
       final disponible = await _health.isHealthConnectAvailable();
-      return disponible ?? false;
-    } catch (_) {
-      return false;
+      return disponible;
+    } catch (error) {
+      throw StateError('No se pudo verificar Health Connect: $error');
     }
   }
 
@@ -20,16 +33,27 @@ class ServicioBiometrico {
     List<HealthDataAccess>? permisos,
   }) async {
     try {
-      final listaPermisos = permisos ??
-          tipos
-              .map((t) => t == HealthDataType.HEART_RATE
-                  ? HealthDataAccess.READ_WRITE
-                  : HealthDataAccess.READ)
-              .toList();
-      final autorizacion = await _health.requestAuthorization(tipos, permissions: listaPermisos);
-      return autorizacion;
-    } catch (_) {
-      return false;
+      await _asegurarConfiguracion();
+      final listaPermisos =
+          permisos ??
+          List<HealthDataAccess>.filled(tipos.length, HealthDataAccess.READ);
+      if (await verificarPermisos(tipos, permisos: listaPermisos)) return true;
+      if (_solicitandoPermisos) {
+        throw StateError('Hay una solicitud de permisos en curso.');
+      }
+      _solicitandoPermisos = true;
+      try {
+        final autorizacion = await _health.requestAuthorization(
+          tipos,
+          permissions: listaPermisos,
+        );
+        if (Platform.isIOS) return autorizacion;
+        return await verificarPermisos(tipos, permisos: listaPermisos);
+      } finally {
+        _solicitandoPermisos = false;
+      }
+    } catch (error) {
+      throw StateError('No se pudo solicitar acceso a Health Connect: $error');
     }
   }
 
@@ -38,19 +62,28 @@ class ServicioBiometrico {
     List<HealthDataAccess>? permisos,
   }) async {
     try {
-      final listaPermisos = permisos ??
-          tipos.map((t) => HealthDataAccess.READ).toList();
-      final tienePermisos = await _health.hasPermissions(tipos, permissions: listaPermisos);
+      await _asegurarConfiguracion();
+      final listaPermisos =
+          permisos ?? tipos.map((t) => HealthDataAccess.READ).toList();
+      final tienePermisos = await _health.hasPermissions(
+        tipos,
+        permissions: listaPermisos,
+      );
       return tienePermisos ?? false;
-    } catch (_) {
-      return false;
+    } catch (error) {
+      throw StateError(
+        'No se pudo consultar los permisos de Health Connect: $error',
+      );
     }
   }
 
   Future<void> revocarPermisos() async {
     try {
+      await _asegurarConfiguracion();
       await _health.revokePermissions();
-    } catch (_) {}
+    } catch (error) {
+      throw StateError('No se pudo revocar el acceso: $error');
+    }
   }
 
   Future<List<HealthDataPoint>> obtenerDatosFrecuenciaCardiaca(
@@ -58,14 +91,9 @@ class ServicioBiometrico {
     DateTime fin,
   ) async {
     try {
-      final datos = await _health.getHealthDataFromTypes(
-        types: const [HealthDataType.HEART_RATE],
-        startTime: inicio,
-        endTime: fin,
-      );
-      return datos;
-    } catch (_) {
-      return [];
+      return await obtenerDatosPorTipo(HealthDataType.HEART_RATE, inicio, fin);
+    } catch (error) {
+      throw StateError('No se pudo leer la frecuencia cardíaca: $error');
     }
   }
 
@@ -75,10 +103,14 @@ class ServicioBiometrico {
     DateTime fin,
   ) async {
     try {
+      await _asegurarConfiguracion();
       final datos = await _health.getHealthDataFromTypes(
         types: [tipo],
         startTime: inicio,
         endTime: fin,
+      );
+      datos.sort(
+        (primero, segundo) => primero.dateFrom.compareTo(segundo.dateFrom),
       );
       return datos;
     } catch (e) {
@@ -86,17 +118,26 @@ class ServicioBiometrico {
     }
   }
 
-  Future<bool> escribirFrecuenciaCardiacaPrueba(double bpm, DateTime momento) async {
+  Future<bool> escribirFrecuenciaCardiacaPrueba(
+    double bpm,
+    DateTime momento,
+  ) async {
     try {
+      final permitido = await solicitarAutorizacion(
+        const [HealthDataType.HEART_RATE],
+        permisos: const [HealthDataAccess.READ_WRITE],
+      );
+      if (!permitido) return false;
       final exito = await _health.writeHealthData(
         value: bpm,
         type: HealthDataType.HEART_RATE,
         startTime: momento,
         endTime: momento.add(const Duration(seconds: 1)),
+        recordingMethod: RecordingMethod.manual,
       );
       return exito;
-    } catch (_) {
-      return false;
+    } catch (error) {
+      throw StateError('No se pudo escribir la lectura de prueba: $error');
     }
   }
 }

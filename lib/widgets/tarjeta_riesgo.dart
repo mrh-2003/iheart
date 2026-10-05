@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:iheart/nucleo/tema.dart';
 
 class TarjetaRiesgo extends StatelessWidget {
-  final double porcentajeRiesgo;
+  final double? porcentajeRiesgo;
   final String nivelRiesgo;
 
   const TarjetaRiesgo({
@@ -29,7 +29,10 @@ class TarjetaRiesgo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorRiesgo = _obtenerColorRiesgo(nivelRiesgo);
+    final riesgo = porcentajeRiesgo;
+    final colorRiesgo = riesgo == null
+        ? TemaApp.textoSecundario
+        : _obtenerColorRiesgo(nivelRiesgo);
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -38,7 +41,7 @@ class TarjetaRiesgo extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -60,7 +63,7 @@ class TarjetaRiesgo extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '${(porcentajeRiesgo * 100).toStringAsFixed(1)}%',
+                riesgo == null ? '—' : '${(riesgo * 100).toStringAsFixed(1)}%',
                 style: TextStyle(
                   fontSize: 36,
                   fontWeight: FontWeight.bold,
@@ -68,13 +71,16 @@ class TarjetaRiesgo extends StatelessWidget {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
-                  color: colorRiesgo.withOpacity(0.12),
+                  color: colorRiesgo.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  nivelRiesgo.toUpperCase(),
+                  riesgo == null ? 'SIN EVALUACIÓN' : nivelRiesgo.toUpperCase(),
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -85,15 +91,21 @@ class TarjetaRiesgo extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: porcentajeRiesgo,
-              minHeight: 12,
-              backgroundColor: TemaApp.grisSuperficie,
-              color: colorRiesgo,
+          if (riesgo == null)
+            const Text(
+              'Complete una evaluación para obtener una estimación.',
+              style: TextStyle(color: TemaApp.textoSecundario),
+            )
+          else
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                value: riesgo,
+                minHeight: 12,
+                backgroundColor: TemaApp.grisSuperficie,
+                color: colorRiesgo,
+              ),
             ),
-          ),
         ],
       ),
     );

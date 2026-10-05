@@ -62,20 +62,19 @@
         </activity>
 
         <!-- Rationale activity for Health Connect (Android 13 y anteriores) -->
-        <activity-alias
-            android:name=".RationaleActivity"
-            android:exported="true"
-            android:targetActivity=".MainActivity">
+        <activity
+            android:name=".PermissionsRationaleActivity"
+            android:exported="true">
             <intent-filter>
-                <action android:name="androidx.health.platform.client.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
             </intent-filter>
-        </activity-alias>
+        </activity>
 
         <!-- ViewPermissionUsageActivity for Health Connect (Android 14+) -->
         <activity-alias
             android:name="ViewPermissionUsageActivity"
             android:exported="true"
-            android:targetActivity=".MainActivity"
+            android:targetActivity=".PermissionsRationaleActivity"
             android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
@@ -93,7 +92,7 @@
     <queries>
         <package android:name="com.google.android.apps.healthdata" />
         <intent>
-            <action android:name="androidx.health.platform.client.ACTION_HEALTH_CONNECT_START" />
+            <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
         </intent>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>

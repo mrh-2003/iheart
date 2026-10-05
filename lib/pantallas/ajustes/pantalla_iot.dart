@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:health/health.dart';
 import 'package:iheart/nucleo/tema.dart';
@@ -32,7 +33,7 @@ class PantallaIoT extends StatefulWidget {
   State<PantallaIoT> createState() => _PantallaIoTState();
 }
 
-class _PantallaIoTState extends State<PantallaIoT> {
+class _PantallaIoTState extends State<PantallaIoT> with WidgetsBindingObserver {
   final List<HealthDataType> _tiposPrincipales = const [
     HealthDataType.HEART_RATE,
     HealthDataType.RESTING_HEART_RATE,
@@ -55,7 +56,24 @@ class _PantallaIoTState extends State<PantallaIoT> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _verificarEstado();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState estado) {
+    if (estado == AppLifecycleState.resumed &&
+        !_cargando &&
+        !_cargandoAccion &&
+        !_escaneandoCrudo) {
+      _verificarEstado();
+    }
   }
 
   Future<void> _verificarEstado() async {
@@ -64,13 +82,17 @@ class _PantallaIoTState extends State<PantallaIoT> {
     });
 
     try {
-      final bool disponible = await ServicioBiometrico.instancia.esHealthConnectDisponible();
+      final bool disponible = await ServicioBiometrico.instancia
+          .esHealthConnectDisponible();
+      if (!mounted) return;
       setState(() {
         _disponible = disponible;
       });
 
       if (disponible) {
-        final bool tienePermisos = await ServicioBiometrico.instancia.verificarPermisos(const [HealthDataType.HEART_RATE]);
+        final bool tienePermisos = await ServicioBiometrico.instancia
+            .verificarPermisos(const [HealthDataType.HEART_RATE]);
+        if (!mounted) return;
         setState(() {
           _autorizado = tienePermisos;
         });
@@ -81,7 +103,9 @@ class _PantallaIoTState extends State<PantallaIoT> {
       }
     } catch (e) {
       if (mounted) {
-        context.mostrarMensajeError('Error al verificar Health Connect: ${e.toString()}');
+        context.mostrarMensajeError(
+          'Error al verificar Health Connect: ${e.toString()}',
+        );
       }
     } finally {
       if (mounted) {
@@ -98,25 +122,35 @@ class _PantallaIoTState extends State<PantallaIoT> {
     });
 
     try {
-      final bool permisoConcedido = await ServicioBiometrico.instancia.solicitarAutorizacion(_tiposPrincipales);
+      final bool permisoConcedido = await ServicioBiometrico.instancia
+          .solicitarAutorizacion(_tiposPrincipales);
+      final bool accesoCardiaco = await ServicioBiometrico.instancia
+          .verificarPermisos(const [HealthDataType.HEART_RATE]);
+      if (!mounted) return;
       setState(() {
-        _autorizado = permisoConcedido;
+        _autorizado = accesoCardiaco;
       });
 
       if (permisoConcedido) {
         if (mounted) {
-          context.mostrarMensajeExito('Permisos de Health Connect concedidos exitosamente.');
+          context.mostrarMensajeExito(
+            'Permisos de Health Connect concedidos exitosamente.',
+          );
         }
-        await _cargarLecturasRecientes();
-        await _ejecutarEscaneoCrudo();
       } else {
         if (mounted) {
-          context.mostrarMensajeError('Permiso denegado por el usuario en Health Connect.');
+          context.mostrarMensajeError(
+            'No se concedieron todos los permisos. El escaneo mostrará el acceso de cada tipo.',
+          );
         }
       }
+      if (accesoCardiaco) await _cargarLecturasRecientes();
+      if (mounted) await _ejecutarEscaneoCrudo();
     } catch (e) {
       if (mounted) {
-        context.mostrarMensajeError('Error al solicitar autorización: ${e.toString()}');
+        context.mostrarMensajeError(
+          'Error al solicitar autorización: ${e.toString()}',
+        );
       }
     } finally {
       if (mounted) {
@@ -134,6 +168,7 @@ class _PantallaIoTState extends State<PantallaIoT> {
 
     try {
       await ServicioBiometrico.instancia.revocarPermisos();
+      if (!mounted) return;
       setState(() {
         _autorizado = false;
         _ultimasLecturas.clear();
@@ -144,7 +179,9 @@ class _PantallaIoTState extends State<PantallaIoT> {
       }
     } catch (e) {
       if (mounted) {
-        context.mostrarMensajeError('Error al revocar permisos: ${e.toString()}');
+        context.mostrarMensajeError(
+          'Error al revocar permisos: ${e.toString()}',
+        );
       }
     } finally {
       if (mounted) {
@@ -159,17 +196,17 @@ class _PantallaIoTState extends State<PantallaIoT> {
     try {
       final ahora = DateTime.now();
       final haceHoras = ahora.subtract(Duration(hours: _horasRango));
-      final datos = await ServicioBiometrico.instancia.obtenerDatosFrecuenciaCardiaca(
-        haceHoras,
-        ahora,
-      );
-
+      final datos = await ServicioBiometrico.instancia
+          .obtenerDatosFrecuenciaCardiaca(haceHoras, ahora);
+      if (!mounted) return;
       setState(() {
         _ultimasLecturas = datos.reversed.toList();
       });
     } catch (e) {
       if (mounted) {
-        context.mostrarMensajeError('Error al cargar lecturas: ${e.toString()}');
+        context.mostrarMensajeError(
+          'Error al cargar lecturas: ${e.toString()}',
+        );
       }
     }
   }
@@ -181,16 +218,22 @@ class _PantallaIoTState extends State<PantallaIoT> {
 
     try {
       final ahora = DateTime.now();
-      final exito = await ServicioBiometrico.instancia.escribirFrecuenciaCardiacaPrueba(76.0, ahora);
+      final exito = await ServicioBiometrico.instancia
+          .escribirFrecuenciaCardiacaPrueba(76.0, ahora);
+      if (!mounted) return;
       if (exito) {
         if (mounted) {
-          context.mostrarMensajeExito('Lectura de prueba (76 bpm) escrita en Health Connect.');
+          context.mostrarMensajeExito(
+            'Lectura de prueba (76 bpm) escrita en Health Connect.',
+          );
         }
         await _cargarLecturasRecientes();
         await _ejecutarEscaneoCrudo();
       } else {
         if (mounted) {
-          context.mostrarMensajeError('No se pudo escribir en Health Connect. Verifique permisos de escritura.');
+          context.mostrarMensajeError(
+            'No se pudo escribir en Health Connect. Verifique permisos de escritura.',
+          );
         }
       }
     } catch (e) {
@@ -207,6 +250,7 @@ class _PantallaIoTState extends State<PantallaIoT> {
   }
 
   Future<void> _ejecutarEscaneoCrudo() async {
+    if (!mounted || _escaneandoCrudo) return;
     setState(() {
       _escaneandoCrudo = true;
     });
@@ -216,42 +260,77 @@ class _PantallaIoTState extends State<PantallaIoT> {
     final inicio = ahora.subtract(Duration(hours: _horasRango));
 
     final mapaTipos = <HealthDataType, Map<String, Object>>{
-      HealthDataType.HEART_RATE: {'nombre': 'Frecuencia Cardíaca (HR)', 'icono': Icons.favorite},
-      HealthDataType.RESTING_HEART_RATE: {'nombre': 'Frecuencia Cardíaca en Reposo', 'icono': Icons.favorite_border},
-      HealthDataType.BLOOD_OXYGEN: {'nombre': 'Saturación de Oxígeno (SpO2)', 'icono': Icons.opacity},
-      HealthDataType.BLOOD_PRESSURE_SYSTOLIC: {'nombre': 'Presión Arterial Sistólica', 'icono': Icons.speed},
-      HealthDataType.BLOOD_PRESSURE_DIASTOLIC: {'nombre': 'Presión Arterial Diastólica', 'icono': Icons.speed_outlined},
-      HealthDataType.STEPS: {'nombre': 'Conteo de Pasos', 'icono': Icons.directions_walk},
-      HealthDataType.HEART_RATE_VARIABILITY_RMSSD: {'nombre': 'Variabilidad Cardíaca (HRV RMSSD)', 'icono': Icons.timeline},
+      HealthDataType.HEART_RATE: {
+        'nombre': 'Frecuencia Cardíaca (HR)',
+        'icono': Icons.favorite,
+      },
+      HealthDataType.RESTING_HEART_RATE: {
+        'nombre': 'Frecuencia Cardíaca en Reposo',
+        'icono': Icons.favorite_border,
+      },
+      HealthDataType.BLOOD_OXYGEN: {
+        'nombre': 'Saturación de Oxígeno (SpO2)',
+        'icono': Icons.opacity,
+      },
+      HealthDataType.BLOOD_PRESSURE_SYSTOLIC: {
+        'nombre': 'Presión Arterial Sistólica',
+        'icono': Icons.speed,
+      },
+      HealthDataType.BLOOD_PRESSURE_DIASTOLIC: {
+        'nombre': 'Presión Arterial Diastólica',
+        'icono': Icons.speed_outlined,
+      },
+      HealthDataType.STEPS: {
+        'nombre': 'Conteo de Pasos',
+        'icono': Icons.directions_walk,
+      },
+      HealthDataType.HEART_RATE_VARIABILITY_RMSSD: {
+        'nombre': 'Variabilidad Cardíaca (HRV RMSSD)',
+        'icono': Icons.timeline,
+      },
     };
 
     for (final entrada in mapaTipos.entries) {
       final tipo = entrada.key;
       final info = entrada.value;
-      final nombre = info['nombre'] is String ? info['nombre'] as String : tipo.name;
-      final icono = info['icono'] is IconData ? info['icono'] as IconData : Icons.health_and_safety;
+      final nombre = switch (info['nombre']) {
+        String valor => valor,
+        _ => tipo.name,
+      };
+      final icono = switch (info['icono']) {
+        IconData valor => valor,
+        _ => Icons.health_and_safety,
+      };
 
       bool tienePermiso = false;
       List<HealthDataPoint> puntos = [];
       String? errorMensaje;
 
       try {
-        tienePermiso = await ServicioBiometrico.instancia.verificarPermisos([tipo]);
+        tienePermiso = await ServicioBiometrico.instancia.verificarPermisos([
+          tipo,
+        ]);
         if (tienePermiso) {
-          puntos = await ServicioBiometrico.instancia.obtenerDatosPorTipo(tipo, inicio, ahora);
+          puntos = await ServicioBiometrico.instancia.obtenerDatosPorTipo(
+            tipo,
+            inicio,
+            ahora,
+          );
         }
       } catch (err) {
         errorMensaje = err.toString();
       }
 
-      lista.add(ResultadoTipoSalud(
-        tipo: tipo,
-        nombre: nombre,
-        icono: icono,
-        tienePermiso: tienePermiso,
-        puntos: puntos,
-        error: errorMensaje,
-      ));
+      lista.add(
+        ResultadoTipoSalud(
+          tipo: tipo,
+          nombre: nombre,
+          icono: icono,
+          tienePermiso: tienePermiso,
+          puntos: puntos,
+          error: errorMensaje,
+        ),
+      );
     }
 
     if (mounted) {
@@ -306,7 +385,11 @@ class _PantallaIoTState extends State<PantallaIoT> {
                 const Expanded(
                   child: Row(
                     children: [
-                      Icon(Icons.health_and_safety_outlined, color: TemaApp.rojoPrimario, size: 28),
+                      Icon(
+                        Icons.health_and_safety_outlined,
+                        color: TemaApp.rojoPrimario,
+                        size: 28,
+                      ),
                       SizedBox(width: 12),
                       Expanded(
                         child: Text(
@@ -325,7 +408,10 @@ class _PantallaIoTState extends State<PantallaIoT> {
                 ),
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: estadoColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
@@ -344,10 +430,7 @@ class _PantallaIoTState extends State<PantallaIoT> {
             const SizedBox(height: 16),
             const Text(
               'Sincronización directa y lectura de datos biométricos de salud desde el repositorio oficial de Android.',
-              style: TextStyle(
-                fontSize: 13,
-                color: TemaApp.textoSecundario,
-              ),
+              style: TextStyle(fontSize: 13, color: TemaApp.textoSecundario),
             ),
           ],
         ),
@@ -428,13 +511,21 @@ class _PantallaIoTState extends State<PantallaIoT> {
       children: [
         const Text(
           'Rango de tiempo:',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: TemaApp.textoOscuro),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+            color: TemaApp.textoOscuro,
+          ),
         ),
         const Spacer(),
         DropdownButton<int>(
           value: _horasRango,
           underline: const SizedBox.shrink(),
-          style: const TextStyle(fontWeight: FontWeight.bold, color: TemaApp.rojoPrimario, fontSize: 13),
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: TemaApp.rojoPrimario,
+            fontSize: 13,
+          ),
           items: const [
             DropdownMenuItem(value: 1, child: Text('Última 1 hora')),
             DropdownMenuItem(value: 6, child: Text('Últimas 6 horas')),
@@ -483,33 +574,43 @@ class _PantallaIoTState extends State<PantallaIoT> {
           children: [
             Expanded(
               child: BotonPrimario(
-                texto: _escaneandoCrudo ? 'Escaneando...' : 'Escanear Todo Health Connect',
+                texto: _escaneandoCrudo
+                    ? 'Escaneando...'
+                    : 'Escanear Todo Health Connect',
                 cargando: _escaneandoCrudo,
                 alPresionar: _escaneandoCrudo ? () {} : _ejecutarEscaneoCrudo,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: BotonSecundario(
-                texto: 'Inyectar Lectura de Prueba (76 bpm)',
-                alPresionar: _cargandoAccion ? () {} : _escribirLecturaPrueba,
-                cargando: _cargandoAccion,
+        if (kDebugMode) ...[
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: BotonSecundario(
+                  texto: 'Inyectar Lectura de Prueba (76 bpm)',
+                  alPresionar: _cargandoAccion ? () {} : _escribirLecturaPrueba,
+                  cargando: _cargandoAccion,
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
         const SizedBox(height: 16),
         if (_resultadosCrudos.isNotEmpty) ...[
           const Text(
             'Resultados del Escaneo:',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: TemaApp.textoOscuro),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              color: TemaApp.textoOscuro,
+            ),
           ),
           const SizedBox(height: 12),
-          ..._resultadosCrudos.map((res) => _construirTarjetaResultadoCrudo(res)),
+          ..._resultadosCrudos.map(
+            (res) => _construirTarjetaResultadoCrudo(res),
+          ),
         ],
       ],
     );
@@ -530,89 +631,112 @@ class _PantallaIoTState extends State<PantallaIoT> {
         border: Border.all(color: colorEstado.withValues(alpha: 0.4)),
       ),
       child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(res.icono, color: colorEstado, size: 22),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    res.nombre,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(res.icono, color: colorEstado, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  res.nombre,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: colorEstado.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    !res.tienePermiso
-                        ? 'Sin Permiso'
-                        : (tieneDatos ? '${res.puntos.length} datos' : '0 datos'),
-                    style: TextStyle(color: colorEstado, fontSize: 11, fontWeight: FontWeight.bold),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: colorEstado.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  res.error != null
+                      ? 'Error'
+                      : !res.tienePermiso
+                      ? 'Sin Permiso'
+                      : (tieneDatos ? '${res.puntos.length} datos' : '0 datos'),
+                  style: TextStyle(
+                    color: colorEstado,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-              ],
-            ),
-            if (res.error != null) ...[
-              const SizedBox(height: 8),
-              Text('Error: ${res.error}', style: const TextStyle(color: TemaApp.rojoError, fontSize: 11)),
-            ],
-            if (res.tienePermiso && !tieneDatos) ...[
-              const SizedBox(height: 8),
-              const Text(
-                'No hay registros en Health Connect para este rango. Verifique que su app de smartwatch (Mi Fitness, Zepp, etc.) tenga la sincronización con Health Connect activada.',
-                style: TextStyle(fontSize: 11, color: TemaApp.textoSecundario),
               ),
             ],
-            if (tieneDatos) ...[
-              const SizedBox(height: 12),
-              const Divider(height: 1),
-              const SizedBox(height: 8),
-              ...res.puntos.take(3).map((punto) {
-                String valorStr = '';
-                final valor = punto.value;
-                if (valor is NumericHealthValue) {
-                  valorStr = '${valor.numericValue} ${punto.unit.name}';
-                } else {
-                  valorStr = valor.toString();
-                }
+          ),
+          if (res.error != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Error: ${res.error}',
+              style: const TextStyle(color: TemaApp.rojoError, fontSize: 11),
+            ),
+          ],
+          if (res.tienePermiso && !tieneDatos) ...[
+            const SizedBox(height: 8),
+            const Text(
+              'No hay registros en Health Connect para este rango. Verifique que su app de smartwatch (Mi Fitness, Zepp, etc.) tenga la sincronización con Health Connect activada.',
+              style: TextStyle(fontSize: 11, color: TemaApp.textoSecundario),
+            ),
+          ],
+          if (tieneDatos) ...[
+            const SizedBox(height: 12),
+            const Divider(height: 1),
+            const SizedBox(height: 8),
+            ...res.puntos.take(3).map((punto) {
+              String valorStr = '';
+              final valor = punto.value;
+              if (valor is NumericHealthValue) {
+                valorStr = '${valor.numericValue} ${punto.unit.name}';
+              } else {
+                valorStr = valor.toString();
+              }
 
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '${_formatearFecha(punto.dateFrom)} · ${punto.sourceName}',
-                          style: const TextStyle(fontSize: 11, color: TemaApp.textoSecundario),
-                          overflow: TextOverflow.ellipsis,
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${_formatearFecha(punto.dateFrom)} · ${punto.sourceName}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: TemaApp.textoSecundario,
                         ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      Text(
-                        valorStr,
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: TemaApp.textoOscuro),
+                    ),
+                    Text(
+                      valorStr,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: TemaApp.textoOscuro,
                       ),
-                    ],
-                  ),
-                );
-              }),
-              if (res.puntos.length > 3)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    '+ ${res.puntos.length - 3} lecturas adicionales...',
-                    style: const TextStyle(fontSize: 11, color: TemaApp.rojoPrimario, fontStyle: FontStyle.italic),
+                    ),
+                  ],
+                ),
+              );
+            }),
+            if (res.puntos.length > 3)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  '+ ${res.puntos.length - 3} lecturas adicionales...',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: TemaApp.rojoPrimario,
+                    fontStyle: FontStyle.italic,
                   ),
                 ),
-            ],
+              ),
           ],
-        ),
-      );
+        ],
+      ),
+    );
   }
 
   Widget _construirListaLecturas() {
@@ -636,7 +760,10 @@ class _PantallaIoTState extends State<PantallaIoT> {
             ),
             Text(
               '${_ultimasLecturas.length} encontradas',
-              style: const TextStyle(fontSize: 12, color: TemaApp.textoSecundario),
+              style: const TextStyle(
+                fontSize: 12,
+                color: TemaApp.textoSecundario,
+              ),
             ),
           ],
         ),
@@ -655,7 +782,10 @@ class _PantallaIoTState extends State<PantallaIoT> {
                 Expanded(
                   child: Text(
                     'No se encontraron lecturas en este rango de tiempo.',
-                    style: TextStyle(color: TemaApp.textoSecundario, fontSize: 13),
+                    style: TextStyle(
+                      color: TemaApp.textoSecundario,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ],
@@ -682,7 +812,10 @@ class _PantallaIoTState extends State<PantallaIoT> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    leading: const Icon(Icons.favorite, color: TemaApp.rojoClaro),
+                    leading: const Icon(
+                      Icons.favorite,
+                      color: TemaApp.rojoClaro,
+                    ),
                     title: Text(
                       '${bpm.toStringAsFixed(0)} bpm',
                       style: const TextStyle(
@@ -726,12 +859,13 @@ class _PantallaIoTState extends State<PantallaIoT> {
       body: SafeArea(
         child: _cargando
             ? const Center(
-                child: CircularProgressIndicator(
-                  color: TemaApp.rojoPrimario,
-                ),
+                child: CircularProgressIndicator(color: TemaApp.rojoPrimario),
               )
             : ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24.0,
+                  vertical: 16.0,
+                ),
                 children: [
                   _construirCabeceraEstado(),
                   const SizedBox(height: 24),

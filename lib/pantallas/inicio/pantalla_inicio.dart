@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:health/health.dart';
 import 'package:iheart/nucleo/tema.dart';
 import 'package:iheart/nucleo/proveedor_estado.dart';
 import 'package:iheart/widgets/boton_primario.dart';
@@ -13,7 +12,6 @@ import 'package:iheart/pantallas/evaluar/pantalla_cuestionario.dart';
 import 'package:iheart/pantallas/historial/pantalla_historial.dart';
 import 'package:iheart/pantallas/perfil/pantalla_perfil.dart';
 import 'package:iheart/pantallas/ajustes/pantalla_ajustes.dart';
-import 'package:iheart/red/servicio_biometrico.dart';
 
 class PantallaInicio extends StatefulWidget {
   final int indiceInicial;
@@ -35,11 +33,11 @@ class _PantallaInicioState extends State<PantallaInicio> {
     super.initState();
     _indiceSeleccionado = widget.indiceInicial;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _solicitarTodosLosPermisos();
+      _solicitarPermisosGenerales();
     });
   }
 
-  Future<void> _solicitarTodosLosPermisos() async {
+  Future<void> _solicitarPermisosGenerales() async {
     try {
       await Permission.notification.request();
       await [
@@ -51,7 +49,6 @@ class _PantallaInicioState extends State<PantallaInicio> {
         await Permission.storage.request();
         await Permission.manageExternalStorage.request();
       }
-      await ServicioBiometrico.instancia.solicitarAutorizacion(const [HealthDataType.HEART_RATE]);
     } catch (_) {}
   }
 
@@ -215,8 +212,14 @@ class _PantallaInicioState extends State<PantallaInicio> {
           _construirCabecera(iniciales, saludoNombre),
           const SizedBox(height: 24),
           TarjetaRiesgo(
-            porcentajeRiesgo: ultimoDiag != null ? (ultimoDiag['probabilidad_cad'] as num).toDouble() : 0.0,
-            nivelRiesgo: ultimoDiag != null ? (ultimoDiag['nivel_riesgo'] as String) : 'bajo',
+            porcentajeRiesgo: switch (ultimoDiag?['probabilidad_cad']) {
+              num valor => valor.toDouble(),
+              _ => null,
+            },
+            nivelRiesgo: switch (ultimoDiag?['nivel_riesgo']) {
+              String valor => valor,
+              _ => 'sin evaluación',
+            },
           ),
           const SizedBox(height: 24),
           _construirBiometria(ultimoDiag),
